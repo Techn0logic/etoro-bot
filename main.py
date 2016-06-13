@@ -1,40 +1,82 @@
 import asyncio
 import aiohttp
-import json
+import logging
 
-async def fetch_page(session, url):
-    url = 'https://www.etoro.com/api/sts/v2/login/?client_request_id=4ca2b203-414e-4c23-82ff-851192b06c65'
-    payload = {'Password': 'hgf658y09bd', 'UserLoginIdentifier': 'kislenko-artem', 'Username': 'kislenko-artem',}
-    # cookies = dict(cookies_are='working')
-    headers = {'content-type': 'application/json;charset=UTF-8',
-               'AccountType': 'Real',
-               'ApplicationIdentifier': 'ReToro',
-               'ApplicationVersion': 'vp3079',
-               'X-CSRF-TOKEN': 'k%7cuGYP%7ci9dVOhujYx0ZsTw%5f%5f',
-               'X-DEVICE-ID': 'ee2838e3-831c-477a-be99-a3a90d372a88'
-               }
+import helpers
+import etoro
 
-    with aiohttp.Timeout(10):
-        async with session.post(url,
-                                data=json.dumps(payload),
-                                headers=headers) as response:
-            assert response.status == 201
-            login_content_josn = await response.read()
-    login_content = json.loads(login_content_josn.decode('utf-8'))
-    params = {'client_request_id': '75d399e3-a7fb-489a-a0b3-b7ef2d9fed23',
-              'conditionIncludeDisplayableInstruments': False,
-              'conditionIncludeMarkets': False,
-              'conditionIncludeMetadata': False,
-              }
-    headers['Authorization'] = login_content['accessToken']
-    with aiohttp.Timeout(10):
-        async with session.get('https://www.etoro.com/api/logininfo/v1.1/logindata' ,params=params,
-                                headers=headers) as response:
-            login_info = await response.read()
-    print(login_info)
+logging.basicConfig(level=logging.INFO)
 
-loop = asyncio.get_event_loop()
-with aiohttp.ClientSession(loop=loop) as session:
-    content = loop.run_until_complete(
-        fetch_page(session, 'https://www.etoro.com/api/sts/v2/login/?client_request_id=b878533a-862d-4ff6-965e-54a3e35f663f'))
-    print(content)
+if '__main__' == __name__:
+    loop = asyncio.get_event_loop()
+    agregate_data = {'Buy': {}, 'Sell': {}}
+    with aiohttp.ClientSession(loop=loop) as session:
+        content = loop.run_until_complete(etoro.login(session))
+        helpers.set_cache('login_info', content)
+        portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
+        logging.info('Balance: {}'.format(portfolio["Credit"]))
+        instruments = helpers.get_cache('instruments')
+        if not instruments:
+            instruments = loop.run_until_complete(etoro.instruments(session))
+            helpers.set_cache('instruments', instruments)
+        instruments = {instrument['InstrumentID']: instrument for instrument in instruments['InstrumentDisplayDatas']}
+        instruments_rate = helpers.get_cache('instruments_rate')
+        if not instruments_rate:
+            instruments = loop.run_until_complete(etoro.instruments_rate(session))
+            helpers.set_cache('instruments_rate', instruments)
+        instruments_rate = {instrument['InstrumentID']: instrument for instrument in instruments_rate['Rates']}
+        for position in portfolio["Positions"]:
+            logging.info('My order: {}. My price: {}. Current Ask: {}. Direct: {}'.format(
+                instruments[position["InstrumentID"]]['SymbolFull'], position["OpenRate"],
+                instruments_rate[position["InstrumentID"]]["Ask"], 'Byu' if position["IsBuy"] else 'Sell'))
+        list_traders = helpers.get_cache('list_traders')
+        if not list_traders:
+            list_traders = loop.run_until_complete(etoro.trader_list(session, gainmin=0, profitablemonthspctmin=35))
+            helpers.set_cache('list_traders', list_traders)
+        logging.info('Traders was found: {}'.format(list_traders['TotalRows']))
+        traders = helpers.get_cache('traders')
+        if not traders:
+            traders = []
+            for trader in list_traders['Items']:
+                trader_info = loop.run_until_complete(etoro.user_info(session, trader['UserName']))
+                traders.append(trader_info)
+            helpers.set_cache('traders', traders)
+        for trader in traders:
+            portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']))
+            if not portfolio:
+                portfolio = loop.run_until_complete(etoro.user_portfolio(session, trader['realCID']))
+                helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
+            for position in portfolio['AggregatedPositions']:
+                if position['Direction'] in agregate_data:
+                    if position['InstrumentID'] not in agregate_data[position['Direction']]:
+                        agregate_data[position['Direction']][position['InstrumentID']] = 0
+                    agregate_data[position['Direction']][position['InstrumentID']] += 1
+    buy_max = {'count': 0, 'ids': []}
+    for instr_id in agregate_data['Buy']:
+        if buy_max['count'] < agregate_data['Buy'][instr_id]:
+            buy_max['count'] = agregate_data['Buy'][instr_id]
+            buy_max['ids'] = [instr_id]
+        if buy_max['count'] == agregate_data['Buy'][instr_id]:
+            if instr_id not in buy_max['ids']:
+                buy_max['ids'].append(instr_id)
+
+    sell_max = {'count': 0, 'ids': []}
+    for instr_id in agregate_data['Sell']:
+        if sell_max['count'] < agregate_data['Sell'][instr_id]:
+            sell_max['count'] = agregate_data['Sell'][instr_id]
+            sell_max['ids'] = [instr_id]
+        if buy_max['count'] == agregate_data['Sell'][instr_id]:
+            if instr_id not in sell_max['ids']:
+                sell_max['ids'].append(instr_id)
+
+    for id in buy_max['ids']:
+        if id in instruments:
+            print('Buy:', instruments[id]['SymbolFull'], sell_max['count'])
+
+    for id in sell_max['ids']:
+        if id in instruments:
+            print('Sell:', instruments[id]['SymbolFull'], sell_max['count'])
+('\n'
+ 'При сделке, необходимо запоминать на основании каких трейдеров было решено войти на рынок.\n'
+ 'Отслеживать сделки этих трейдов по купленным\проданным инструментам.\n'
+ 'В случае сброса этих инструментов следовать трейдерам.\n')

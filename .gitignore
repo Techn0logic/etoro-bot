@@ -89,6 +89,10 @@ ENV/
 
 # Rope project settings
 .ropeproject
-
-Будет удалено .gitignore
-Будет удалено .idea/
+.idea/.name
+.idea/encodings.xml
+.idea/etoro.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/workspace.xml
+settings.py

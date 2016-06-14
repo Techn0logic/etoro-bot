@@ -36,7 +36,7 @@ async def trader_list(session, activeweeksmin=30, blocked=False, bonusonly=False
 
 async def instruments_rate(session):
     url = 'https://www.etoro.com/sapi/trade-real/instruments/?client_request_id={}' \
-          '&InstrumentDataFilters=Activity,Rates'.format(helpers.device_id())
+          '&InstrumentDataFilters=Activity,Rates,TradingData'.format(helpers.device_id())
     return await get(session, url)
 
 
@@ -66,9 +66,40 @@ async def get(session, url, json=True):
                 data = await response.read()
     return data
 
+async def close_order(session, position_id, price):
+    logging.info('Order was closed. Price: {}'.format(price))
+    url = 'https://www.etoro.com/sapi/trade-demo/positions/{position_id}?' \
+          'client_request_id={client_id}&ClientViewRate={price}' \
+          '&PositionID={position_id}'.format(position_id=position_id, client_id=helpers.device_id(), price=price)
+    headers = helpers.get_cache('headers')
+    async with session.delete(url, headers=headers) as response:
+        resp = await response.json()
+    print(resp)
+    return resp
+
+
+async def order(session, InstrumentID, ClientViewRate, IsBuy=True, IsTslEnabled=False, Leverage=1, Amount=25):
+    logging.info('Order is opened. Instrument: {}. IsBuy: {}'.format(InstrumentID, IsBuy))
+    url = 'https://www.etoro.com/sapi/trade-demo/positions?client_request_id={}'.format(helpers.device_id())
+    stop_loss = (ClientViewRate * 1.4) if not IsBuy else (ClientViewRate * 0.6)
+    take_profit = (ClientViewRate * 1.4) if IsBuy else (ClientViewRate * 0.6)
+    headers = helpers.get_cache('headers')
+    payload = {
+        'Amount': Amount,
+        'ClientViewRate': ClientViewRate,
+        'InstrumentID': InstrumentID,
+        'IsBuy': IsBuy,
+        'IsTslEnabled': IsTslEnabled,
+        'Leverage': Leverage,
+        'StopLossRate': stop_loss,
+        'TakeProfitRate': take_profit,
+    }
+    async with session.post(url, data=json.dumps(payload), headers=headers) as response:
+        resp = await response.json()
+    return resp
+
 
 async def login(session):
-    login_info = None
     url = 'https://www.etoro.com/api/sts/v2/login/?client_request_id={}'.format(helpers.device_id())
     payload = settings.payload
     params = {'client_request_id': helpers.device_id(),

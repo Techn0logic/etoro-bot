@@ -107,4 +107,13 @@ if '__main__' == __name__:
                         loop.run_until_complete(etoro.order(session, id, instruments_rate[id]['Bid'],
                                                             Amount=instruments_instrument[id]['MinPositionAmount'],
                                                             Leverage=instruments_instrument[id]['Leverages'][0]))
+
+            for instrument_id in my_portfolio:
+                if instrument_id not in buy_max['ids'] and instrument_id not in sell_max['ids']:
+                    logging.info('Deleting of instrument {}'.format(instruments[instrument_id]['SymbolFull']))
+                    price_view = instruments_rate[instrument_id]['Ask'] if my_portfolio[instrument_id]['IsBuy'] else \
+                        instruments_rate[instrument_id]['Bid']
+                    loop.run_until_complete(etoro.close_order(session, my_portfolio[instrument_id]['PositionID'],
+                                                              price_view))
+        logging.info('Sleeping {} sec'.format(1300))
         time.sleep(1300)

@@ -74,7 +74,6 @@ async def close_order(session, position_id, price):
     headers = helpers.get_cache('headers')
     async with session.delete(url, headers=headers) as response:
         resp = await response.json()
-    print(resp)
     return resp
 
 

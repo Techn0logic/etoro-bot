@@ -3,6 +3,11 @@ import random
 import os
 import json
 import time
+from typing import TypeVar
+
+
+DictInt = TypeVar('DictInt', dict, list)
+
 
 def id_generator(size=8, chars='absdef' + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -16,14 +21,14 @@ def device_id():
         if symblol == 'x' or symblol == 'y':
             n = 16 * random.random()
             if n:
-                n = n / 3
+                n /= 3
             else:
                 n = 8
             pattern_list[key] = hex(int(n)).replace('0x', '')
     return "".join(pattern_list)
 
 
-def set_cache(key: string, data: dict) -> None:
+def set_cache(key: string, data: DictInt) -> None:
     base_path = os.path.dirname(__file__)
     with open(os.path.join(base_path, 'temp', key), 'w') as fd:
         fd.write(json.dumps(data))

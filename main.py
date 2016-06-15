@@ -8,11 +8,11 @@ import etoro
 logging.basicConfig(level=logging.INFO)
 
 
-async def my_loop(arg_loop):
+async def my_loop(in_loop):
     aggregate_data = {'Buy': {}, 'Sell': {}}
     my_portfolio = {}
     while True:
-        with aiohttp.ClientSession(loop=arg_loop) as session:
+        with aiohttp.ClientSession(loop=in_loop) as session:
             content = await etoro.login(session)
             helpers.set_cache('login_info', content)
             portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
@@ -119,8 +119,8 @@ async def my_loop(arg_loop):
 
 if '__main__' == __name__:
     try:
-        my_loop = asyncio.get_event_loop()
-        coroutine = my_loop(loop=my_loop)
-        my_loop.run_until_complete(coroutine)
+        loop = asyncio.get_event_loop()
+        coroutine = my_loop(loop)
+        loop.run_until_complete(coroutine)
     except KeyboardInterrupt:
         logging.info('Exit')

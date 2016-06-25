@@ -8,15 +8,15 @@ import etoro
 logging.basicConfig(level=logging.INFO)
 
 
-async def my_loop(in_loop):
+async def my_loop(in_loop, aviable_limit=50):
     aggregate_data = {'Buy': {}, 'Sell': {}}
     my_portfolio = {}
     while True:
         with aiohttp.ClientSession(loop=in_loop) as session:
             content = await etoro.login(session)
             helpers.set_cache('login_info', content)
-            portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
-            logging.info('Balance: {}'.format(portfolio["Credit"]))
+            user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
+            logging.info('Balance: {}'.format(user_portfolio["Credit"]))
             instruments = helpers.get_cache('instruments')
             if not instruments:
                 instruments = await etoro.instruments(session)
@@ -30,7 +30,7 @@ async def my_loop(in_loop):
             instruments_instrument = {instrument['InstrumentID']: instrument for instrument in
                                       instruments_rate['Instruments']}
             instruments_rate = {instrument['InstrumentID']: instrument for instrument in instruments_rate['Rates']}
-            for position in portfolio["Positions"]:
+            for position in user_portfolio["Positions"]:
                 my_portfolio[position["InstrumentID"]] = {
                     'IsBuy': position["IsBuy"],
                     'Amount': position["Amount"],
@@ -52,16 +52,21 @@ async def my_loop(in_loop):
                     trader_info = await etoro.user_info(session, trader['UserName'])
                     traders.append(trader_info)
                 helpers.set_cache('traders', traders)
+
             for trader in traders:
                 portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']))
                 if not portfolio:
                     portfolio = await etoro.user_portfolio(session, trader['realCID'])
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
                 for position in portfolio['AggregatedPositions']:
-                    if position['Direction'] in aggregate_data:
+                    if position['Direction'] in aggregate_data \
+                            and instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= aviable_limit\
+                            and instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= user_portfolio["Credit"]:
                         if position['InstrumentID'] not in aggregate_data[position['Direction']]:
                             aggregate_data[position['Direction']][position['InstrumentID']] = 0
                         aggregate_data[position['Direction']][position['InstrumentID']] += 1
+                        break
+
             buy_max = {'count': 0, 'ids': []}
             for instr_id in aggregate_data['Buy']:
                 if buy_max['count'] < aggregate_data['Buy'][instr_id]:
@@ -80,33 +85,36 @@ async def my_loop(in_loop):
                     if instr_id not in sell_max['ids']:
                         sell_max['ids'].append(instr_id)
 
-            for instr_id in buy_max['ids']:
-                if instr_id in instruments:
-                    if instr_id in my_portfolio and my_portfolio[instr_id]['IsBuy']:
-                        logging.info('You have {} in your portfolio'.format(instruments[instr_id]['SymbolFull']))
-                    elif instr_id in my_portfolio and not my_portfolio[instr_id]['IsBuy']:
-                        logging.info('You have backward {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
-                        await etoro.close_order(session, my_portfolio[instr_id]['PositionID'],
-                                                instruments_rate[instr_id]['Ask'])
-                    else:
-                        logging.info('You didn\'t have {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
-                        await etoro.order(session, instr_id, instruments_rate[instr_id]['Ask'],
-                                          Amount=instruments_instrument[instr_id]['MinPositionAmount'],
-                                          Leverage=instruments_instrument[instr_id]['Leverages'][0])
+            logging.info('buy info {}, sell info {}'.format(buy_max, sell_max))
+            if buy_max['count'] > 1:
+                for instr_id in buy_max['ids']:
+                    if instr_id in instruments:
+                        if instr_id in my_portfolio and my_portfolio[instr_id]['IsBuy']:
+                            logging.info('You have {} in your portfolio'.format(instruments[instr_id]['SymbolFull']))
+                        elif instr_id in my_portfolio and not my_portfolio[instr_id]['IsBuy']:
+                            logging.info('You have backward {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
+                            await etoro.close_order(session, my_portfolio[instr_id]['PositionID'],
+                                                    instruments_rate[instr_id]['Ask'])
+                        else:
+                            logging.info('You didn\'t have {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
+                            await etoro.order(session, instr_id, instruments_rate[instr_id]['Ask'],
+                                              Amount=instruments_instrument[instr_id]['MinPositionAmount'],
+                                              Leverage=instruments_instrument[instr_id]['Leverages'][0])
 
-            for instr_id in sell_max['ids']:
-                if instr_id in instruments:
-                    if instr_id in my_portfolio and not my_portfolio[instr_id]['IsBuy']:
-                        logging.info('You have {} in your portfolio'.format(instruments[instr_id]['SymbolFull']))
-                    elif instr_id in my_portfolio and my_portfolio[instr_id]['IsBuy']:
-                        logging.info('You have backward {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
-                        await etoro.close_order(session, my_portfolio[instr_id]['PositionID'],
-                                                instruments_rate[instr_id]['Bid'])
-                    else:
-                        logging.info('You didn\'t have {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
-                        await etoro.order(session, instr_id, instruments_rate[instr_id]['Bid'], IsBuy=False,
-                                          Amount=instruments_instrument[instr_id]['MinPositionAmount'],
-                                          Leverage=instruments_instrument[instr_id]['Leverages'][0])
+            if sell_max['count'] > 1:
+                for instr_id in sell_max['ids']:
+                    if instr_id in instruments:
+                        if instr_id in my_portfolio and not my_portfolio[instr_id]['IsBuy']:
+                            logging.info('You have {} in your portfolio'.format(instruments[instr_id]['SymbolFull']))
+                        elif instr_id in my_portfolio and my_portfolio[instr_id]['IsBuy']:
+                            logging.info('You have backward {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
+                            await etoro.close_order(session, my_portfolio[instr_id]['PositionID'],
+                                                    instruments_rate[instr_id]['Bid'])
+                        else:
+                            logging.info('You didn\'t have {} in portfolio'.format(instruments[instr_id]['SymbolFull']))
+                            await etoro.order(session, instr_id, instruments_rate[instr_id]['Bid'], IsBuy=False,
+                                              Amount=instruments_instrument[instr_id]['MinPositionAmount'],
+                                              Leverage=instruments_instrument[instr_id]['Leverages'][0])
 
             for instrument_id in my_portfolio:
                 if instrument_id not in buy_max['ids'] and instrument_id not in sell_max['ids']:

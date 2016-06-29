@@ -94,10 +94,10 @@ async def my_loop(in_loop, aviable_limit=50):
             sell_max = helpers.get_list_instruments(aggregate_data, type='Sell')
 
             logging.info('buy info {}, sell info {}'.format(buy_max, sell_max))
-            if buy_max['count'] > 1:
+            if buy_max['count'] > 2:
                 await trading(buy_max, is_buy=True, demo=True)
 
-            if sell_max['count'] > 1:
+            if sell_max['count'] > 2:
                 await trading(sell_max, is_buy=False, demo=True)
 
             for instrument_id in my_portfolio:

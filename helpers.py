@@ -5,7 +5,6 @@ import json
 import time
 from typing import TypeVar
 
-
 DictInt = TypeVar('DictInt', dict, list)
 
 
@@ -64,6 +63,21 @@ def get_cache(key: string, period: int=1) -> dict:
         return json.loads(file_content)
     else:
         return {}
+
+
+def get_list_instruments(aggregate_data, type='Buy'):
+    max_store = {'count': 0, 'ids': []}
+    for instr_id in aggregate_data[type]:
+        if max_store['count'] < aggregate_data[type][instr_id]:
+            max_store['count'] = aggregate_data[type][instr_id]
+            max_store['ids'] = [instr_id]
+        if max_store['count'] == aggregate_data[type][instr_id]:
+            if instr_id not in max_store['ids']:
+                max_store['ids'].append(instr_id)
+    return max_store
+
+
+
 
 
 if '__main__' == __name__:

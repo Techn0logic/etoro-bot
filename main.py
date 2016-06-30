@@ -32,21 +32,28 @@ async def my_loop(in_loop, aviable_limit=50):
                                       Leverage=instruments_instrument[instr_id]['Leverages'][0], IsBuy=is_buy,
                                       demo=demo)
 
-    aggregate_data = {'Buy': {}, 'Sell': {}}
-    my_portfolio = {}
+    time_out = 5
+    not_login = False
     while True:
+        aggregate_data = {'Buy': {}, 'Sell': {}}
+        my_portfolio = {}
         with aiohttp.ClientSession(loop=in_loop) as session:
-            content = await etoro.login(session)
+            content = await etoro.login(session, only_info=not_login)
+            if "AggregatedResult" not in content:
+                logging.info('Login fail')
+                not_login = False
+                continue
+            not_login = True
             helpers.set_cache('login_info', content)
             user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
             logging.info('Balance: {}'.format(user_portfolio["Credit"]))
-            instruments = helpers.get_cache('instruments')
+            instruments = helpers.get_cache('instruments', (time_out-1))
             if not instruments:
                 instruments = await etoro.instruments(session)
                 helpers.set_cache('instruments', instruments)
             instruments = {instrument['InstrumentID']: instrument for instrument in
                            instruments['InstrumentDisplayDatas']}
-            instruments_rate = helpers.get_cache('instruments_rate')
+            instruments_rate = helpers.get_cache('instruments_rate', (time_out-1))
             if not instruments_rate:
                 instruments_rate = await etoro.instruments_rate(session)
                 helpers.set_cache('instruments_rate', instruments_rate)
@@ -63,12 +70,12 @@ async def my_loop(in_loop, aviable_limit=50):
                 logging.info('My order: {}. My price: {}. Current Ask: {}. Direct: {}'.format(
                     instruments[position["InstrumentID"]]['SymbolFull'], position["OpenRate"],
                     instruments_rate[position["InstrumentID"]]["Ask"], 'Byu' if position["IsBuy"] else 'Sell'))
-            list_traders = helpers.get_cache('list_traders')
+            list_traders = helpers.get_cache('list_traders', (time_out-1))
             if not list_traders:
                 list_traders = await etoro.trader_list(session, gainmin=0, profitablemonthspctmin=35)
                 helpers.set_cache('list_traders', list_traders)
             logging.info('Traders was found: {}'.format(list_traders['TotalRows']))
-            traders = helpers.get_cache('traders')
+            traders = helpers.get_cache('traders', (time_out-1))
             if not traders:
                 traders = []
                 for trader in list_traders['Items']:
@@ -77,7 +84,7 @@ async def my_loop(in_loop, aviable_limit=50):
                 helpers.set_cache('traders', traders)
 
             for trader in traders:
-                portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']))
+                portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']), (time_out-1))
                 if not portfolio:
                     portfolio = await etoro.user_portfolio(session, trader['realCID'])
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
@@ -108,8 +115,8 @@ async def my_loop(in_loop, aviable_limit=50):
                     price_view = instruments_rate[instrument_id]['Ask'] if my_portfolio[instrument_id]['IsBuy'] else \
                         instruments_rate[instrument_id]['Bid']
                     await etoro.close_order(session, my_portfolio[instrument_id]['PositionID'], price_view)
-        logging.info('Sleeping {} sec'.format(1300))
-        await asyncio.sleep(1300)
+        logging.info('Sleeping {} min'.format(time_out))
+        await asyncio.sleep(time_out*60)
 
 if '__main__' == __name__:
     try:

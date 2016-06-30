@@ -6,7 +6,7 @@ import time
 from typing import TypeVar
 
 DictInt = TypeVar('DictInt', dict, list)
-
+defaul_time_cache = 60
 
 def id_generator(size=8, chars='absdef' + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
@@ -50,12 +50,12 @@ def cookies_parse(response_cookies):
     return cookies_dict
 
 
-def get_cache(key: string, period: int=1) -> dict:
+def get_cache(key: string, number_of_time: int=1) -> dict:
     base_path = os.path.dirname(__file__)
     path = os.path.join(base_path, 'temp', key)
     if os.path.isfile(path):
         mod_time = time.time() - os.path.getmtime(path)
-        if mod_time > period*3600:
+        if mod_time > number_of_time*defaul_time_cache:
             return {}
         with open(path, 'r') as fd:
             file_content = fd.read()

@@ -55,13 +55,17 @@ async def user_portfolio(session, user_id):
     return await get(session, url)
 
 async def get(session, url, json=True):
-    logging.info('Get query to {url}'.format(url=url.split('?')[0]))
+    logging.debug('Get query to {url}'.format(url=url.split('?')[0]))
     headers = helpers.get_cache('headers')
     cookies = helpers.get_cache('cookies')
     with aiohttp.Timeout(10):
         async with session.get(url, headers=headers) as response:
             if json:
-                data = await response.json()
+                try:
+                    data = await response.json()
+                except:
+                    logging.error('{}'.format(response.read()))
+                    return False
             else:
                 data = await response.read()
     return data
@@ -100,7 +104,7 @@ async def order(session, InstrumentID, ClientViewRate, IsBuy=True, IsTslEnabled=
     return resp
 
 
-async def login(session, account_type='Demo'):
+async def login(session, account_type='Demo', only_info=False):
     url = 'https://www.etoro.com/api/sts/v2/login/?client_request_id={}'.format(helpers.device_id())
     payload = settings.payload
     params = {'client_request_id': helpers.device_id(),
@@ -116,17 +120,18 @@ async def login(session, account_type='Demo'):
                'X-DEVICE-ID': helpers.device_id()
                }
     helpers.set_cache('headers', headers)
-    with aiohttp.Timeout(10):
-        async with session.post(url,
-                                data=json.dumps(payload),
-                                headers=headers) as response:
-            assert response.status == 201
-            login_content_josn = await response.read()
-    login_content = json.loads(login_content_josn.decode('utf-8'))
-    headers['Authorization'] = login_content['accessToken']
-    helpers.set_cache('headers', headers)
-    cookies_dict = helpers.cookies_parse(response.cookies)
-    helpers.set_cache('cookies', cookies_dict)
+    if not only_info:
+        with aiohttp.Timeout(10):
+            async with session.post(url,
+                                    data=json.dumps(payload),
+                                    headers=headers) as response:
+                assert response.status == 201
+                login_content_josn = await response.read()
+        login_content = json.loads(login_content_josn.decode('utf-8'))
+        headers['Authorization'] = login_content['accessToken']
+        helpers.set_cache('headers', headers)
+        cookies_dict = helpers.cookies_parse(response.cookies)
+        helpers.set_cache('cookies', cookies_dict)
     with aiohttp.Timeout(10):
         async with session.get('https://www.etoro.com/api/logininfo/v1.1/logindata' ,params=params,
                                 headers=headers) as response:

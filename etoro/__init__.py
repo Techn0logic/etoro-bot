@@ -60,14 +60,7 @@ async def get(session, url, json=True):
     cookies = helpers.get_cache('cookies')
     with aiohttp.Timeout(10):
         async with session.get(url, headers=headers) as response:
-            if json:
-                try:
-                    data = await response.json()
-                except:
-                    logging.error('{}'.format(response.read()))
-                    return False
-            else:
-                data = await response.read()
+            data = await response.json()
     return data
 
 async def close_order(session, position_id, price, demo=True):

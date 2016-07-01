@@ -66,6 +66,8 @@ def get_cache(key: string, number_of_time: int=1) -> dict:
 
 
 def get_list_instruments(aggregate_data, type='Buy'):
+    if not aggregate_data:
+        return {}
     max_store = {'count': 0, 'ids': []}
     for instr_id in aggregate_data[type]:
         if max_store['count'] < aggregate_data[type][instr_id]:

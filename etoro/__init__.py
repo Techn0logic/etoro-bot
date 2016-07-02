@@ -1,6 +1,6 @@
 import aiohttp
 import json
-import logging
+from my_logging import logger as logging
 
 import settings
 import helpers

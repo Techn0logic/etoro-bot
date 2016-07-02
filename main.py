@@ -1,13 +1,12 @@
 import asyncio
 import aiohttp
-import logging
+from my_logging import logger as logging
 from concurrent.futures import ProcessPoolExecutor
 import random
 
 import helpers
 import etoro
 
-logging.basicConfig(level=logging.INFO)
 
 class MyTrade(object):
 
@@ -17,7 +16,7 @@ class MyTrade(object):
         self.time_out = 0.5
         self.cache_time = 5
         self.session = aiohttp.ClientSession(loop=in_loop)
-        self.aviable_limit=50
+        self.aviable_limit = 50
         self.user_portfolio = {}
         self.instruments = {}
         self.instruments_rate = {}
@@ -30,12 +29,12 @@ class MyTrade(object):
             pass
 
     async def traders_info(self):
-        list_traders = helpers.get_cache('list_traders', (self.cache_time))
+        list_traders = helpers.get_cache('list_traders', self.cache_time)
         if not list_traders:
             list_traders = await etoro.trader_list(self.session, gainmin=0, profitablemonthspctmin=35)
             helpers.set_cache('list_traders', list_traders)
         logging.info('Traders was found: {}'.format(list_traders['TotalRows']))
-        traders = helpers.get_cache('traders', (self.cache_time))
+        traders = helpers.get_cache('traders', self.cache_time)
         if not traders:
             traders = []
             for trader in list_traders['Items']:
@@ -48,7 +47,7 @@ class MyTrade(object):
             if not portfolio:
                 try:
                     portfolio = await etoro.user_portfolio(self.session, trader['realCID'])
-                except:
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
                     logging.error('Query Error')
                     break
                 if portfolio:
@@ -76,17 +75,17 @@ class MyTrade(object):
                 self.instruments_rate[position["InstrumentID"]]["Ask"], 'Byu' if position["IsBuy"] else 'Sell'))
 
     async def check_instruments(self):
-        self.instruments = helpers.get_cache('instruments', (self.cache_time))
+        self.instruments = helpers.get_cache('instruments', self.cache_time)
         if not self.instruments:
             try:
                 self.instruments = await etoro.instruments(self.session)
-            except:
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
                 logging.error('Query Error')
                 return False
             helpers.set_cache('instruments', self.instruments)
         self.instruments = {instrument['InstrumentID']: instrument for instrument in
                        self.instruments['InstrumentDisplayDatas']}
-        self.instruments_rate = helpers.get_cache('instruments_rate', (self.cache_time))
+        self.instruments_rate = helpers.get_cache('instruments_rate', self.cache_time)
         if not self.instruments_rate:
             self.instruments_rate = await etoro.instruments_rate(self.session)
             helpers.set_cache('instruments_rate', self.instruments_rate)
@@ -106,11 +105,13 @@ class MyTrade(object):
                     self.instruments_rate[instrument_id]['Bid']
                 try:
                     await etoro.close_order(self.session, self.my_portfolio[instrument_id]['PositionID'], price_view)
-                except:
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
                     logging.error('Query Error')
                     break
 
     async def login(self):
+        if self.session.closed:
+            self.session.close()
         content = await etoro.login(self.session)
         return content
 
@@ -132,7 +133,8 @@ class MyTrade(object):
                         try:
                             await etoro.close_order(self.session, self.my_portfolio[instr_id]['PositionID'],
                                                 self.instruments_rate[instr_id][rate_type], demo=demo)
-                        except:
+                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                            logging.error('Error close order')
                             return False
                     else:
                         logging.info('You didn\'t have {} in portfolio'.format(self.instruments[instr_id]['SymbolFull']))
@@ -141,19 +143,28 @@ class MyTrade(object):
                                           Amount=self.instruments_instrument[instr_id]['MinPositionAmount'],
                                           Leverage=self.instruments_instrument[instr_id]['Leverages'][0], IsBuy=is_buy,
                                           demo=demo)
-                        except:
+                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                            logging.error('Error order')
                             return False
-
 
         while True:
             self.aggregate_data = {'Buy': {}, 'Sell': {}}
-            content = await etoro.login(self.session, only_info=True)
+            try:
+                content = await etoro.login(self.session, only_info=True)
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                logging.error('Login fail')
+                await asyncio.sleep(self.time_out)
+
             helpers.set_cache('login_info', content)
 
             while "AggregatedResult" not in content:
-                logging.info('Login fail')
-                content = await self.login()
-                continue
+                try:
+                    logging.info('Login fail')
+                    content = await self.login()
+                    continue
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                    logging.error('Login fail')
+                    await asyncio.sleep(self.time_out)
 
             self.user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
             logging.info('Balance: {}'.format(self.user_portfolio["Credit"]))

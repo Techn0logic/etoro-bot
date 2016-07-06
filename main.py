@@ -3,6 +3,7 @@ import aiohttp
 from my_logging import logger as logging
 from concurrent.futures import ProcessPoolExecutor
 import random
+import json
 
 import helpers
 import etoro
@@ -13,8 +14,8 @@ class MyTrade(object):
     def __init__(self, in_loop):
         self.aggregate_data = {}
         self.trade = {}
-        self.time_out = 0.5
-        self.cache_time = 5
+        self.time_out = 5
+        self.cache_time = 20
         self.session = aiohttp.ClientSession(loop=in_loop)
         self.aviable_limit = 50
         self.user_portfolio = {}
@@ -31,24 +32,41 @@ class MyTrade(object):
     async def traders_info(self):
         list_traders = helpers.get_cache('list_traders', self.cache_time)
         if not list_traders:
-            list_traders = await etoro.trader_list(self.session, gainmin=0, profitablemonthspctmin=35)
+            try:
+                list_traders = await etoro.trader_list(self.session, gainmin=0, profitablemonthspctmin=35)
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
+                logging.error('Query Error')
+                return False
+            except json.decoder.JSONDecodeError:
+                logging.error('Json error')
+                return False
             helpers.set_cache('list_traders', list_traders)
         logging.info('Traders was found: {}'.format(list_traders['TotalRows']))
         traders = helpers.get_cache('traders', self.cache_time)
         if not traders:
             traders = []
             for trader in list_traders['Items']:
-                trader_info = await etoro.user_info(self.session, trader['UserName'])
+                try:
+                    trader_info = await etoro.user_info(self.session, trader['UserName'])
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
+                    logging.error('Query Error')
+                    break
+                except json.decoder.JSONDecodeError:
+                    logging.error('Json decode error')
+                    break
                 traders.append(trader_info)
             helpers.set_cache('traders', traders)
 
         for trader in traders:
-            portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']), (random.randint(1, self.cache_time)))
+            portfolio = helpers.get_cache('trader_portfolios/{}'.format(trader['realCID']), (random.randint(5, self.cache_time)))
             if not portfolio:
                 try:
                     portfolio = await etoro.user_portfolio(self.session, trader['realCID'])
-                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                     logging.error('Query Error')
+                    break
+                except json.decoder.JSONDecodeError:
+                    logging.error('Json decode error')
                     break
                 if portfolio:
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
@@ -79,15 +97,25 @@ class MyTrade(object):
         if not self.instruments:
             try:
                 self.instruments = await etoro.instruments(self.session)
-            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                 logging.error('Query Error')
+                return False
+            except json.decoder.JSONDecodeError:
+                logging.error('Json decode error')
                 return False
             helpers.set_cache('instruments', self.instruments)
         self.instruments = {instrument['InstrumentID']: instrument for instrument in
                        self.instruments['InstrumentDisplayDatas']}
         self.instruments_rate = helpers.get_cache('instruments_rate', self.cache_time)
         if not self.instruments_rate:
-            self.instruments_rate = await etoro.instruments_rate(self.session)
+            try:
+                self.instruments_rate = await etoro.instruments_rate(self.session)
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
+                logging.error('Query Error')
+                return False
+            except json.decoder.JSONDecodeError:
+                logging.error('Json decode error')
+                return False
             helpers.set_cache('instruments_rate', self.instruments_rate)
         self.instruments_instrument = {instrument['InstrumentID']: instrument for instrument in
                                   self.instruments_rate['Instruments']}
@@ -105,8 +133,11 @@ class MyTrade(object):
                     self.instruments_rate[instrument_id]['Bid']
                 try:
                     await etoro.close_order(self.session, self.my_portfolio[instrument_id]['PositionID'], price_view)
-                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                     logging.error('Query Error')
+                    break
+                except json.decoder.JSONDecodeError:
+                    logging.error('Json decode error')
                     break
 
     async def login(self):
@@ -131,28 +162,39 @@ class MyTrade(object):
                                                            (not is_buy and self.my_portfolio[instr_id]['IsBuy'])):
                         logging.info('You have backward {} in portfolio'.format(self.instruments[instr_id]['SymbolFull']))
                         try:
-                            await etoro.close_order(self.session, self.my_portfolio[instr_id]['PositionID'],
+                            if instr_id in self.instruments_rate:
+                                await etoro.close_order(self.session, self.my_portfolio[instr_id]['PositionID'],
                                                 self.instruments_rate[instr_id][rate_type], demo=demo)
-                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                             logging.error('Error close order')
+                            return False
+                        except json.decoder.JSONDecodeError:
+                            logging.error('Json decode error')
                             return False
                     else:
                         logging.info('You didn\'t have {} in portfolio'.format(self.instruments[instr_id]['SymbolFull']))
                         try:
-                            await etoro.order(self.session, instr_id, self.instruments_rate[instr_id][rate_type],
+                            if instr_id in self.instruments_rate:
+                                await etoro.order(self.session, instr_id, self.instruments_rate[instr_id][rate_type],
                                           Amount=self.instruments_instrument[instr_id]['MinPositionAmount'],
                                           Leverage=self.instruments_instrument[instr_id]['Leverages'][0], IsBuy=is_buy,
                                           demo=demo)
-                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                             logging.error('Error order')
+                            return False
+                        except json.decoder.JSONDecodeError:
+                            logging.error('Json decode error')
                             return False
 
         while True:
             self.aggregate_data = {'Buy': {}, 'Sell': {}}
             try:
                 content = await etoro.login(self.session, only_info=True)
-            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+            except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                 logging.error('Login fail')
+                await asyncio.sleep(self.time_out)
+            except json.decoder.JSONDecodeError:
+                logging.error('Json decode error')
                 await asyncio.sleep(self.time_out)
 
             helpers.set_cache('login_info', content)
@@ -162,8 +204,11 @@ class MyTrade(object):
                     logging.info('Login fail')
                     content = await self.login()
                     continue
-                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError):
+                except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                     logging.error('Login fail')
+                    await asyncio.sleep(self.time_out)
+                except json.decoder.JSONDecodeError:
+                    logging.error('Json decode error')
                     await asyncio.sleep(self.time_out)
 
             self.user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]

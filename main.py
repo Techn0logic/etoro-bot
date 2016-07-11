@@ -15,7 +15,7 @@ class MyTrade(object):
         self.aggregate_data = {}
         self.trade = {}
         self.time_out = 5
-        self.cache_time = 20
+        self.cache_time_value = 20
         self.session = aiohttp.ClientSession(loop=in_loop)
         self.aviable_limit = 50
         self.user_portfolio = {}
@@ -24,6 +24,10 @@ class MyTrade(object):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
+
+    @property
+    def cache_time(self):
+        return random.randint(self.cache_time_value-7, self.cache_time_value)
 
     def do_somesing(self):
         while True:
@@ -42,18 +46,22 @@ class MyTrade(object):
                 return False
             helpers.set_cache('list_traders', list_traders)
         logging.info('Traders was found: {}'.format(list_traders['TotalRows']))
-        traders = helpers.get_cache('traders', self.cache_time)
+        traders = helpers.get_cache('traders', self.cache_time*10)
         if not traders:
             traders = []
             for trader in list_traders['Items']:
                 try:
-                    trader_info = await etoro.user_info(self.session, trader['UserName'])
+                    trader_info = helpers.get_cache('trader_portfolios/trader_info_{}'.format(trader['UserName']),
+                                                    self.cache_time)
+                    if not trader_info:
+                        trader_info = await etoro.user_info(self.session, trader['UserName'])
+                        helpers.set_cache('trader_portfolios/trader_info_{}'.format(trader['UserName']), trader_info)
                 except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError, aiohttp.errors.ClientResponseError):
                     logging.error('Query Error')
-                    break
+                    return False
                 except json.decoder.JSONDecodeError:
                     logging.error('Json decode error')
-                    break
+                    return False
                 traders.append(trader_info)
             helpers.set_cache('traders', traders)
 
@@ -67,7 +75,7 @@ class MyTrade(object):
                     break
                 except json.decoder.JSONDecodeError:
                     logging.error('Json decode error')
-                    break
+                    return False
                 if portfolio:
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
             if portfolio:
@@ -79,6 +87,7 @@ class MyTrade(object):
                             self.aggregate_data[position['Direction']][position['InstrumentID']] = 0
                         self.aggregate_data[position['Direction']][position['InstrumentID']] += 1
                         break
+        return True
 
     def full_my_porfolio(self):
         for position in self.user_portfolio["Positions"]:
@@ -215,21 +224,21 @@ class MyTrade(object):
             logging.info('Balance: {}'.format(self.user_portfolio["Credit"]))
 
             await self.check_instruments()
-            await self.traders_info()
+            trader_info_status = await self.traders_info()
+            if trader_info_status:
+                buy_max = helpers.get_list_instruments(self.aggregate_data)
+                sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')
+                if not buy_max and not sell_max:
+                    continue
 
-            buy_max = helpers.get_list_instruments(self.aggregate_data)
-            sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')
-            if not buy_max and not sell_max:
-                continue
+                logging.info('buy info {}, sell info {}'.format(buy_max, sell_max))
+                if buy_max['count'] > 2:
+                    await trading(buy_max, is_buy=True, demo=True)
 
-            logging.info('buy info {}, sell info {}'.format(buy_max, sell_max))
-            if buy_max['count'] > 2:
-                await trading(buy_max, is_buy=True, demo=True)
+                if sell_max['count'] > 2:
+                    await trading(sell_max, is_buy=False, demo=True)
 
-            if sell_max['count'] > 2:
-                await trading(sell_max, is_buy=False, demo=True)
-
-            await self.check_my_order(buy_max, sell_max)
+                await self.check_my_order(buy_max, sell_max)
 
             logging.info('Sleeping {} sec'.format(self.time_out))
             await asyncio.sleep(self.time_out)

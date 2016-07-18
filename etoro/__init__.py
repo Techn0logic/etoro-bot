@@ -78,7 +78,7 @@ async def close_order(session, position_id, price, demo=True):
 async def order(session, InstrumentID, ClientViewRate, IsBuy=True, IsTslEnabled=False, Leverage=1, Amount=25, demo=True):
     logging.info('Order is opened. Instrument: {}. IsBuy: {}'.format(InstrumentID, IsBuy))
     url = 'https://www.etoro.com/sapi/trade-{account_type}/positions?client_request_id={}'.format(helpers.device_id(),
-                                             account_type='demo' if demo else 'real')
+                                                                                                  account_type='demo' if demo else 'real')
     stop_loss = (ClientViewRate * 1.4) if not IsBuy else (ClientViewRate * 0.6)
     take_profit = (ClientViewRate * 1.4) if IsBuy else (ClientViewRate * 0.6)
     headers = helpers.get_cache('headers')

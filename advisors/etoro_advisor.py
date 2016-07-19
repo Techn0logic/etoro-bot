@@ -7,7 +7,7 @@ import json
 import helpers
 import etoro
 from my_logging import logger as logging
-
+from messengers import Messenger
 
 class EtoroAdvisor(object):
 
@@ -24,6 +24,7 @@ class EtoroAdvisor(object):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
+        self.messenger = Messenger()
 
     @property
     def cache_time(self):
@@ -224,6 +225,7 @@ class EtoroAdvisor(object):
 
         await self.check_instruments()
         trader_info_status = await self.traders_info()
+        await self.messenger.send('dd')
         if trader_info_status:
             buy_max = helpers.get_list_instruments(self.aggregate_data)
             sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')
@@ -232,9 +234,11 @@ class EtoroAdvisor(object):
 
             logging.info('buy info {}, sell info {}'.format(buy_max, sell_max))
             if buy_max['count'] > 2:
-                await trading(buy_max, is_buy=True, demo=True)
+                # await trading(buy_max, is_buy=True, demo=True)
+                pass
 
             if sell_max['count'] > 2:
-                await trading(sell_max, is_buy=False, demo=True)
+                # await trading(sell_max, is_buy=False, demo=True)
+                pass
 
-            await self.check_my_order(buy_max, sell_max)
+            # await self.check_my_order(buy_max, sell_max)

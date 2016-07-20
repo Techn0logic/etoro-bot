@@ -5,7 +5,10 @@ import sys
 
 class Messenger(ABCMessenger):
 
-    async def send(self, message):
+    def __init__(self, loop):
+        self.loop = loop
+
+    def send(self, message, title=''):
         if hasattr(sys.modules[__name__], messenger):
-            my_messenger = getattr(sys.modules[__name__], messenger)()
-        await my_messenger.send(message, recipients)
+            my_messenger = getattr(sys.modules[__name__], messenger)(self.loop)
+        my_messenger.send(message, title=title, recipients=recipients[messenger])

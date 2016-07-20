@@ -13,3 +13,5 @@ messenger = 'SmtpAlert'
 recipients = {
     'SmtpAlert': ['artem@webart-tech.ru']
 }
+
+account_type = 'Demo'

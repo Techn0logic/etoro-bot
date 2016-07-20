@@ -3,11 +3,14 @@ import asyncio
 
 import random
 import json
+import operator
 
 import helpers
 import etoro
 from my_logging import logger as logging
 from messengers import Messenger
+import settings
+
 
 class EtoroAdvisor(object):
 
@@ -24,7 +27,8 @@ class EtoroAdvisor(object):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
-        self.messenger = Messenger()
+        self.messenger = Messenger(in_loop)
+        self.account_type = settings.account_type
 
     @property
     def cache_time(self):
@@ -34,7 +38,7 @@ class EtoroAdvisor(object):
         while True:
             pass
 
-    async def traders_info(self):
+    async def traders_info(self, entire_balance=True):
         list_traders = helpers.get_cache('list_traders', self.cache_time)
         if not list_traders:
             try:
@@ -80,10 +84,11 @@ class EtoroAdvisor(object):
                 if portfolio:
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
             if portfolio:
+                balance = 9999999 if entire_balance else self.user_portfolio["Credit"]
                 for position in portfolio['AggregatedPositions']:
                     if position['Direction'] in self.aggregate_data \
                             and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= self.aviable_limit\
-                            and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= self.user_portfolio["Credit"]:
+                            and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= balance:
                         if position['InstrumentID'] not in self.aggregate_data[position['Direction']]:
                             self.aggregate_data[position['Direction']][position['InstrumentID']] = 0
                         self.aggregate_data[position['Direction']][position['InstrumentID']] += 1
@@ -153,7 +158,7 @@ class EtoroAdvisor(object):
     async def login(self):
         if self.session.closed:
             self.session.close()
-        content = await etoro.login(self.session)
+        content = await etoro.login(self.session, account_type=self.account_type)
         return content
 
     async def etoro_loop(self):
@@ -225,7 +230,26 @@ class EtoroAdvisor(object):
 
         await self.check_instruments()
         trader_info_status = await self.traders_info()
-        await self.messenger.send('dd')
+        buy_list = {self.instruments[inst_id]['SymbolFull']:self.aggregate_data['Buy'][inst_id]
+                    for inst_id in self.aggregate_data['Buy']}
+        buy_list = sorted(buy_list.items(), key=operator.itemgetter(1), reverse=True)
+        sell_list = {self.instruments[inst_id]['SymbolFull']:self.aggregate_data['Sell'][inst_id]
+                    for inst_id in self.aggregate_data['Sell']}
+        sell_list = sorted(sell_list.items(), key=operator.itemgetter(1), reverse=True)
+
+        message = 'Баланс: {}\r\n\r\n'.format(self.user_portfolio["Credit"])
+        message += 'Мое портфолио: \r\n'
+        for position in self.user_portfolio["Positions"]:
+            message += 'My order: {}. My price: {}. Current Ask: {}. Direct: {}\r\n'.format(
+                self.instruments[position["InstrumentID"]]['SymbolFull'], position["OpenRate"],
+                self.instruments_rate[position["InstrumentID"]]["Ask"], 'Byu' if position["IsBuy"] else 'Sell')
+        message += '\r\nПокупка: \r\n'
+        for tuple_item in buy_list:
+            message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
+        message += '\r\nПродажа: \r\n'
+        for tuple_item in sell_list:
+            message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
+        self.messenger.send(message, title='Рекомендации по инструментам etoro')
         if trader_info_status:
             buy_max = helpers.get_list_instruments(self.aggregate_data)
             sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')

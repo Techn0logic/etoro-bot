@@ -3,7 +3,8 @@ from interfaces.messenger import ABCMessenger
 from settings import messenger, recipients
 import sys
 
-class Messenger(ABCMessenger):
+
+class MessageManager(ABCMessenger):
 
     def __init__(self, loop):
         self.loop = loop

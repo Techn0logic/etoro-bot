@@ -8,7 +8,7 @@ import operator
 import helpers
 import etoro
 from my_logging import logger as logging
-from messengers import Messenger
+from messengers import MessageManager
 import settings
 
 
@@ -27,7 +27,7 @@ class EtoroAdvisor(object):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
-        self.messenger = Messenger(in_loop)
+        self.messenger = MessageManager(in_loop)
         self.account_type = settings.account_type
 
     @property

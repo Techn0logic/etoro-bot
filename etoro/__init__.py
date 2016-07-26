@@ -33,12 +33,17 @@ async def trader_list(session, activeweeksmin=30, blocked=False, bonusonly=False
                                                     dailyddmin=dailyddmin, dailyddmax=dailyddmax)
     return await get(session, list_trades_url)
 
+async def get_history():
+    url = 'https://candle.etoro.com/candles/desc.json/ThirtyMinutes/1000/1'
+    #url = 'https://candle.etoro.com/candles/desc.json/FiveMinutes/1000/1'
+    async with aiohttp.ClientSession() as session:
+        data = await get(session, url)
+    return data
 
 async def instruments_rate(session):
     url = 'https://www.etoro.com/sapi/trade-real/instruments/?client_request_id={}' \
           '&InstrumentDataFilters=Activity,Rates,TradingData'.format(helpers.device_id())
     return await get(session, url)
-
 
 async def instruments(session):
     url = 'https://api.etorostatic.com/sapi/instrumentsmetadata/V1.1/instruments'
@@ -47,7 +52,6 @@ async def instruments(session):
 async def user_info(session, login):
     url = 'https://www.etoro.com/api/logininfo/v1.1/users/{}?client_request_id={}'.format(login, helpers.device_id())
     return await get(session, url)
-
 
 async def user_portfolio(session, user_id):
     url = 'https://www.etoro.com/sapi/trade-real/portfolios/public?client_request_id={}&cid={}'.format(

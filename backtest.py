@@ -28,7 +28,7 @@ if __name__ == "__main__":
         history_items = loop.run_until_complete(etoro.get_history(i))
         if 'Candles' in history_items and history_items['Candles'] is not None:
             if history_items['Candles'][0]['Candles']:
-                for item in history_items['Candles'][0]['Candles']:
+                for item in reversed(history_items['Candles'][0]['Candles']):
                     dataframe.append({'asc': item['Close'],
                                    'bid': item['Open'],
                                    'date': item['FromDate']})

@@ -19,20 +19,21 @@ class First():
             start = self.my_store[-10]
             end = self.my_store[-1]
             if self.last_price == 0:
-                self.last_price = asc
                 extremum = (end-start) * coef
-                if extremum < -5:
+                if extremum > profit:
+                    self.last_price = asc
                     self.order(cls, asc, 'sell')
-                if extremum > 5:
+                if extremum < 0:
                     pass
-                    # self.order(cls, asc, 'buy')
+                    #self.last_price = asc
+                    #self.order(cls, asc, 'buy')
             else:
                 if self.direct == 'buy':
                     profit_pt = (asc - self.last_price) * coef
                 else:
                     profit_pt = (self.last_price - asc) * coef
                 logger.debug('DifPrice: {} Coef: {}, Profit: {} Last-Price: {}'.format((asc - self.last_price), coef, profit_pt, self.last_price))
-                if profit_pt > profit or profit_pt < -1*profit:
+                if profit_pt > profit or profit_pt < -1*profit/2:
                     if profit_pt > profit:
                         logger.debug('plus')
                     else:

@@ -33,8 +33,8 @@ async def trader_list(session, activeweeksmin=30, blocked=False, bonusonly=False
                                                     dailyddmin=dailyddmin, dailyddmax=dailyddmax)
     return await get(session, list_trades_url)
 
-async def get_history():
-    url = 'https://candle.etoro.com/candles/desc.json/ThirtyMinutes/1000/1'
+async def get_history(instrument_id=1, count=1000):
+    url = 'https://candle.etoro.com/candles/desc.json/ThirtyMinutes/{}/{}'.format(count, instrument_id)
     #url = 'https://candle.etoro.com/candles/desc.json/FiveMinutes/1000/1'
     async with aiohttp.ClientSession() as session:
         data = await get(session, url)

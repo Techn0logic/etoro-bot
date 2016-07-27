@@ -1,3 +1,5 @@
+from my_logging import logger
+
 class First():
     def __init__(self):
         self.direct = 'buy'
@@ -8,8 +10,7 @@ class First():
     def start(self, cls, start_date):
         pass
 
-    def tick(self, cls, asc, bid, date):
-        count = 1
+    def tick(self, cls, asc, bid, date, coef):
         profit = 10
         if len(self.my_store) <= 10:
             self.my_store.append(asc)
@@ -19,18 +20,25 @@ class First():
             end = self.my_store[-1]
             if self.last_price == 0:
                 self.last_price = asc
-                if start > end:
+                extremum = (end-start) * coef
+                if extremum < -5:
                     self.order(cls, asc, 'sell')
-                else:
-                    self.order(cls, asc, 'buy')
+                if extremum > 5:
+                    pass
+                    # self.order(cls, asc, 'buy')
             else:
                 if self.direct == 'buy':
-                    profit_pt = (asc - self.last_price) * 1000
+                    profit_pt = (asc - self.last_price) * coef
                 else:
-                    profit_pt = (self.last_price - asc) * 1000
-                if profit_pt > profit or profit_pt/2 < -1*profit:
+                    profit_pt = (self.last_price - asc) * coef
+                logger.debug('DifPrice: {} Coef: {}, Profit: {} Last-Price: {}'.format((asc - self.last_price), coef, profit_pt, self.last_price))
+                if profit_pt > profit or profit_pt < -1*profit:
+                    if profit_pt > profit:
+                        logger.debug('plus')
+                    else:
+                        logger.debug('minus')
                     self.order(cls, asc, self.backdirect[self.direct])
-                # print(profit_pt)
+                    self.last_price = 0
 
 
     def finish(self, cls, finish_date):

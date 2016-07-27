@@ -8,11 +8,12 @@ import operator
 import helpers
 import etoro
 from my_logging import logger as logging
+from interfaces.advisor import ABCAdvisor
 from messengers import MessageManager
 import settings
 
 
-class EtoroAdvisor(object):
+class EtoroAdvisor(ABCAdvisor):
 
     def __init__(self, in_loop):
         self.aggregate_data = {}
@@ -161,7 +162,7 @@ class EtoroAdvisor(object):
         content = await etoro.login(self.session, account_type=self.account_type)
         return content
 
-    async def etoro_loop(self):
+    async def loop(self):
 
         async def trading(store_max, is_buy=True, demo=True):
             if is_buy:

@@ -9,7 +9,6 @@ import helpers
 import etoro
 from my_logging import logger as logging
 from interfaces.advisor import ABCAdvisor
-from messengers import MessageManager
 import settings
 
 
@@ -28,7 +27,7 @@ class EtoroAdvisor(ABCAdvisor):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
-        self.messenger = MessageManager(in_loop)
+        # self.messenger = MessageManager(in_loop)
         self.account_type = settings.account_type
 
     @property
@@ -250,7 +249,7 @@ class EtoroAdvisor(ABCAdvisor):
         message += '\r\nПродажа: \r\n'
         for tuple_item in sell_list:
             message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
-        self.messenger.send(message, title='Рекомендации по инструментам etoro')
+
         if trader_info_status:
             buy_max = helpers.get_list_instruments(self.aggregate_data)
             sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')
@@ -267,3 +266,4 @@ class EtoroAdvisor(ABCAdvisor):
                 pass
 
             # await self.check_my_order(buy_max, sell_max)
+        return message

@@ -14,6 +14,7 @@ recipients = {
     'SmtpAlert': ['artem@webart-tech.ru']
 }
 
+trade_strategy = 'First'
 account_type = 'Demo'
 
 stocks = {

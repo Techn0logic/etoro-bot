@@ -10,9 +10,10 @@ import settings
 class YahooAdvisor(ABCAdvisor):
     def __init__(self, in_loop):
         self.session = aiohttp.ClientSession(loop=in_loop)
-        self.message = '\r\nYahoo\r\n\r\n'
+        self.message = ''
 
     async def loop(self):
+        self.message = '\r\nYahoo\r\n\r\n'
         self.message += 'Recommendation\r\n'
         for stock in settings.stocks:
             url = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/{stock}?formatted=true&crumb=a9I3lxfM3R3&lang=en-US&region=US&modules=upgradeDowngradeHistory%2CrecommendationTrend%2CearningsTrend&corsDomain=finance.yahoo.com'.format(

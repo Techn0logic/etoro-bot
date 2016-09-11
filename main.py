@@ -15,7 +15,7 @@ async def eternal_cycle():
         datetime_obj = datetime.datetime.now()
         current_time = datetime_obj.time()
         week_day = datetime_obj.weekday()
-        if str(current_time).find(settings.strtime_send_message) != 0:
+        if str(current_time).find(settings.strtime_send_message) >= 0:
             etoro_message = yahoo_message = cluster_message = ''
             try:
                 etoro_message = await etoro.loop()

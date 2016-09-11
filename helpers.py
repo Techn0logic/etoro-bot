@@ -55,7 +55,7 @@ def get_cache(key: string, number_of_time: int=1) -> dict:
     path = os.path.join(base_path, 'temp', key)
     if os.path.isfile(path):
         mod_time = time.time() - os.path.getmtime(path)
-        if mod_time > number_of_time*defaul_time_cache:
+        if number_of_time and mod_time > (number_of_time*defaul_time_cache):
             return {}
         with open(path, 'r') as fd:
             file_content = fd.read()

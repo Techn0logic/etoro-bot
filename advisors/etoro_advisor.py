@@ -85,14 +85,15 @@ class EtoroAdvisor(ABCAdvisor):
                     helpers.set_cache('trader_portfolios/{}'.format(trader['realCID']), portfolio)
             if portfolio:
                 balance = 9999999 if entire_balance else self.user_portfolio["Credit"]
-                for position in portfolio['AggregatedPositions']:
-                    if position['Direction'] in self.aggregate_data \
-                            and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= self.aviable_limit\
-                            and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= balance:
-                        if position['InstrumentID'] not in self.aggregate_data[position['Direction']]:
-                            self.aggregate_data[position['Direction']][position['InstrumentID']] = 0
-                        self.aggregate_data[position['Direction']][position['InstrumentID']] += 1
-                        break
+                if 'AggregatedPositions' in portfolio:
+                    for position in portfolio['AggregatedPositions']:
+                        if position['Direction'] in self.aggregate_data \
+                                and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= self.aviable_limit\
+                                and self.instruments_instrument[position['InstrumentID']]['MinPositionAmount'] <= balance:
+                            if position['InstrumentID'] not in self.aggregate_data[position['Direction']]:
+                                self.aggregate_data[position['Direction']][position['InstrumentID']] = 0
+                            self.aggregate_data[position['Direction']][position['InstrumentID']] += 1
+                            break
         return True
 
     def full_my_porfolio(self):
@@ -225,7 +226,8 @@ class EtoroAdvisor(ABCAdvisor):
                 logging.error('Json decode error')
                 await asyncio.sleep(self.time_out)
 
-        self.user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"]["ClientPortfolio"]
+        self.user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"][
+            "ClientPortfolio"]
         logging.info('Balance: {}'.format(self.user_portfolio["Credit"]))
 
         await self.check_instruments()
@@ -249,7 +251,11 @@ class EtoroAdvisor(ABCAdvisor):
         message += '\r\nПродажа: \r\n'
         for tuple_item in sell_list:
             message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
-
+        close_orders = helpers.set_cache('close_orders', 0)
+        if close_orders:
+            message += '\r\nОрдера, закрытые роботом: \r\n'
+            for close_order_key in close_orders:
+                message += '{}: {}'.format(close_order_key, close_orders[close_order_key])
         if trader_info_status:
             buy_max = helpers.get_list_instruments(self.aggregate_data)
             sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')

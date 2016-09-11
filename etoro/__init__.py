@@ -67,15 +67,26 @@ async def get(session, url, json=True):
             data = await response.json()
     return data
 
-async def close_order(session, position_id, price, demo=True):
+async def close_order(session, position_id, price=None, demo=True):
     logging.info('Order was closed. Price: {}'.format(price))
-    url = 'https://www.etoro.com/sapi/trade-{account_type}/positions/{position_id}?' \
+    account_type = 'demo' if demo else 'real'
+    headers = helpers.get_cache('headers')
+    if price is None:
+        url = 'https://www.etoro.com/sapi/trade-{account_type}/exit-orders?client_request_id={client_id}'.format(
+            client_id=helpers.device_id(), account_type=account_type
+        )
+        payload = {
+            'PendingClosePositionID': '433073215'
+        }
+        async with session.post(url, data=json.dumps(payload), headers=headers) as response:
+            resp = await response.json()
+    else:
+        url = 'https://www.etoro.com/sapi/trade-{account_type}/positions/{position_id}?' \
           'client_request_id={client_id}&ClientViewRate={price}' \
           '&PositionID={position_id}'.format(position_id=position_id, client_id=helpers.device_id(), price=price,
-                                             account_type='demo' if demo else 'real')
-    headers = helpers.get_cache('headers')
-    async with session.delete(url, headers=headers) as response:
-        resp = await response.json()
+                                             account_type=account_type)
+        async with session.delete(url, headers=headers) as response:
+            resp = await response.json()
     return resp
 
 

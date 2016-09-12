@@ -23,8 +23,11 @@ class StrategyAdvisor(ABCAdvisor):
     async def loop(self):
         history_items = await etoro.get_history(count=2)
         close_orders = etoro.helpers.get_cache('close_orders', 0)
+        fine_orders = etoro.helpers.get_cache('fine_orders', 0)
         if not close_orders:
             close_orders = {}
+        if not fine_orders:
+            fine_orders = {}
         if 'Candles' in history_items and history_items['Candles'] is not None:
             self.ask = history_items['Candles'][0]['Candles'][0]['Close']
             self.bid = self.ask + self.swop_buy
@@ -58,10 +61,22 @@ class StrategyAdvisor(ABCAdvisor):
             else:
                 fee_relative = (instrument_current_price*100/instrument_my_price) - 100
                 fee_absolute = instrument_current_price-instrument_my_price
-            if fee_relative < 1.5 and position['InstrumentID'] not in exit_orders:
+            if fee_relative < -1.5 and position['InstrumentID'] not in exit_orders:
                 await etoro.close_order(self.session, position_id)
                 close_orders[instrument_name] = instrument_current_price
                 etoro.helpers.set_cache('close_orders', close_orders)
+            if fee_relative > 1.5 and instrument_name not in fine_orders:
+                fine_orders[instrument_name] = fee_relative
+            if instrument_name in fine_orders:
+                if fee_relative > fine_orders[instrument_name]:
+                    fine_orders[instrument_name] = fee_relative
+                if (fine_orders[instrument_name] - fee_relative) >= 1.5:
+                    await etoro.close_order(self.session, position_id)
+                    close_orders[instrument_name] = instrument_current_price
+                    etoro.helpers.set_cache('close_orders', close_orders)
+                    del fine_orders[instrument_name]
+
+
 
 
 

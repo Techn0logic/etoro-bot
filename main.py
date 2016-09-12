@@ -15,13 +15,12 @@ async def eternal_cycle():
         datetime_obj = datetime.datetime.now()
         current_time = datetime_obj.time()
         week_day = datetime_obj.weekday()
+        etoro_message = yahoo_message = cluster_message = ''
+        try:
+            etoro_message = await etoro.loop()
+        except Exception as e:
+            logging.error(str(e))
         if str(current_time).find(settings.strtime_send_message) >= 0:
-            etoro_message = yahoo_message = cluster_message = ''
-            try:
-                etoro_message = await etoro.loop()
-            except Exception as e:
-                logging.error(str(e))
-
             try:
                 yahoo_message = await yahoo.loop()
             except Exception as e:
@@ -38,7 +37,7 @@ async def eternal_cycle():
                 await strategy.loop()
         except Exception as e:
             logging.error(str(e))
-        await asyncio.sleep(5)
+        await asyncio.sleep(50)
 
 if '__main__' == __name__:
     try:

@@ -9,7 +9,9 @@ class MessageManager(ABCMessenger):
     def __init__(self, loop):
         self.loop = loop
 
-    def send(self, message=[], title=''):
+    def send(self, message, title=''):
         if hasattr(sys.modules[__name__], messenger):
             my_messenger = getattr(sys.modules[__name__], messenger)(self.loop)
-        my_messenger.send("\r\n\r\n".join(message), title=title, recipients=recipients[messenger])
+        if isinstance(message, list):
+            message = "\r\n\r\n".join(message)
+        my_messenger.send(message, title=title, recipients=recipients[messenger])

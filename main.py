@@ -5,7 +5,7 @@ from advisors.etoro_advisor import EtoroAdvisor
 from advisors.yahoo_advisor import YahooAdvisor
 from advisors.strategy_advisor import StrategyAdvisor
 from messengers import MessageManager
-from science import cluster
+# from science import cluster
 import datetime
 import settings
 
@@ -15,26 +15,29 @@ async def eternal_cycle():
         datetime_obj = datetime.datetime.now()
         current_time = datetime_obj.time()
         week_day = datetime_obj.weekday()
-        etoro_message = yahoo_message = cluster_message = ''
         try:
-            etoro_message = await etoro.loop()
+            await etoro.loop()
         except Exception as e:
             logging.error(str(e))
-        if str(current_time).find(settings.strtime_send_message) >= 0:
+        if str(current_time).find(settings.strtime_send_message) == 0:
+
             try:
-                yahoo_message = await yahoo.loop()
+                await yahoo.loop()
             except Exception as e:
                 logging.error(str(e))
 
-            try:
-                cluster_message = cluster.analysis()
-            except Exception as e:
-                logging.error(str(e))
+            # try:
+            #     cluster_message = cluster.analysis()
+            # except Exception as e:
+            #     logging.error(str(e))
 
-            messenger.send([cluster_message, etoro_message, yahoo_message], title='Рекомендации по инструментам etoro')
+            messenger.send([etoro.get_message(), yahoo.get_message()],
+                           title='Рекомендации по инструментам etoro')
         try:
             if week_day != 6 and week_day != 5:
                 await strategy.loop()
+                if strategy.get_message():
+                    messenger.send(strategy.get_message(), title='Попытка заркыть позицию')
         except Exception as e:
             logging.error(str(e))
         await asyncio.sleep(50)

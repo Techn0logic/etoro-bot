@@ -27,7 +27,8 @@ class EtoroAdvisor(ABCAdvisor):
         self.instruments_instrument = {}
         self.my_portfolio = {}
         self.time_out *= 60
-        # self.messenger = MessageManager(in_loop)
+        self.message = ''
+        # self.messenger = self.messageManager(in_loop)
         self.account_type = settings.account_type
 
     @property
@@ -239,23 +240,23 @@ class EtoroAdvisor(ABCAdvisor):
                     for inst_id in self.aggregate_data['Sell']}
         sell_list = sorted(sell_list.items(), key=operator.itemgetter(1), reverse=True)
 
-        message = 'Баланс: {}\r\n\r\n'.format(self.user_portfolio["Credit"])
-        message += 'Мое портфолио: \r\n'
+        self.message = 'Баланс: {}\r\n\r\n'.format(self.user_portfolio["Credit"])
+        self.message += 'Мое портфолио: \r\n'
         for position in self.user_portfolio["Positions"]:
-            message += 'My order: {}. My price: {}. Current Ask: {}. Direct: {}\r\n'.format(
+            self.message += 'My order: {}. My price: {}. Current Ask: {}. Direct: {}\r\n'.format(
                 self.instruments[position["InstrumentID"]]['SymbolFull'], position["OpenRate"],
                 self.instruments_rate[position["InstrumentID"]]["Ask"], 'Byu' if position["IsBuy"] else 'Sell')
-        message += '\r\nПокупка: \r\n'
+        self.message += '\r\nПокупка: \r\n'
         for tuple_item in buy_list:
-            message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
-        message += '\r\nПродажа: \r\n'
+            self.message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
+        self.message += '\r\nПродажа: \r\n'
         for tuple_item in sell_list:
-            message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
+            self.message += '{}: {}\r\n'.format(tuple_item[0], tuple_item[1])
         close_orders = helpers.set_cache('close_orders', 0)
         if close_orders:
-            message += '\r\nОрдера, закрытые роботом: \r\n'
+            self.message += '\r\nОрдера, закрытые роботом: \r\n'
             for close_order_key in close_orders:
-                message += '{}: {}'.format(close_order_key, close_orders[close_order_key])
+                self.message += '{}: {}'.format(close_order_key, close_orders[close_order_key])
         if trader_info_status:
             buy_max = helpers.get_list_instruments(self.aggregate_data)
             sell_max = helpers.get_list_instruments(self.aggregate_data, type='Sell')
@@ -272,4 +273,7 @@ class EtoroAdvisor(ABCAdvisor):
                 pass
 
             # await self.check_my_order(buy_max, sell_max)
-        return message
+        return self.message
+
+    def get_message(self):
+        return self.message

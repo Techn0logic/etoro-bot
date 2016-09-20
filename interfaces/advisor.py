@@ -10,3 +10,7 @@ class ABCAdvisor():
     @abstractmethod
     async def loop(self):
         pass
+
+    @abstractmethod
+    def get_message(self):
+        pass

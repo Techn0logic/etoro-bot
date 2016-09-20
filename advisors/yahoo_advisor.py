@@ -38,4 +38,6 @@ class YahooAdvisor(ABCAdvisor):
                     period=earning['period'], growth=earning['growth']['fmt'] if 'fmt' in earning['growth'] else '',
                     earningsEstimate=earning['earningsEstimate']['avg']['fmt']
                     if 'fmt' in earning['earningsEstimate']['avg'] else 'None')
+
+    def get_message(self):
         return self.message

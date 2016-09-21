@@ -40,5 +40,7 @@ if '__main__' == __name__:
             asyncio.ensure_future(loop.run_in_executor(executor, messages_listen))
             loop.run_until_complete(asyncio.wait(tasks))
     except KeyboardInterrupt:
-        loop.close()
         logging.info('Exit')
+    finally:
+        loop.close()
+

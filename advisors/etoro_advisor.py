@@ -4,6 +4,7 @@ import asyncio
 import random
 import json
 import operator
+import datetime
 
 import helpers
 import etoro
@@ -14,7 +15,9 @@ import settings
 
 class EtoroAdvisor(ABCAdvisor):
 
-    def __init__(self, in_loop):
+    def __init__(self, in_loop, **kwargs):
+        if 'messenger' in kwargs:
+            kwargs['messenger'].clients.append(self)
         self.aggregate_data = {}
         self.trade = {}
         self.time_out = 5
@@ -30,6 +33,7 @@ class EtoroAdvisor(ABCAdvisor):
         self.message = ''
         # self.messenger = self.messageManager(in_loop)
         self.account_type = settings.account_type
+        self.last_start = datetime.datetime.now()
 
     @property
     def cache_time(self):
@@ -164,7 +168,10 @@ class EtoroAdvisor(ABCAdvisor):
         return content
 
     async def loop(self):
-
+        dif_time = datetime.datetime.now() - self.last_start
+        if dif_time.seconds > 0 and dif_time.seconds < 300:
+            return False
+        self.last_start = datetime.datetime.now()
         async def trading(store_max, is_buy=True, demo=True):
             if is_buy:
                 rate_type = 'Ask'
@@ -276,4 +283,8 @@ class EtoroAdvisor(ABCAdvisor):
         return self.message
 
     def get_message(self):
+        datetime_obj = datetime.datetime.now()
+        current_time = datetime_obj.time()
+        if str(current_time).find(settings.strtime_send_message) != 0:
+            return False
         return self.message

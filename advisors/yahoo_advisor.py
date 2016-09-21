@@ -1,18 +1,24 @@
 import aiohttp
-import asyncio
 import etoro
-
-from my_logging import logger as logging
-from interfaces.advisor import ABCAdvisor
 import settings
+
+from interfaces.advisor import ABCAdvisor
+import datetime
 
 
 class YahooAdvisor(ABCAdvisor):
-    def __init__(self, in_loop):
+    def __init__(self, in_loop, **kwargs):
+        if 'messenger' in kwargs:
+            kwargs['messenger'].clients.append(self)
         self.session = aiohttp.ClientSession(loop=in_loop)
         self.message = ''
 
     async def loop(self):
+        datetime_obj = datetime.datetime.now()
+        current_time = datetime_obj.time()
+        if str(current_time).find(settings.strtime_send_message) != 0:
+            return False
+
         self.message = '\r\nYahoo\r\n\r\n'
         self.message += 'Recommendation\r\n'
         for stock in settings.stocks:

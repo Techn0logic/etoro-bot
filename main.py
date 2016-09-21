@@ -1,56 +1,44 @@
 import asyncio
 from my_logging import logger as logging
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 from advisors.etoro_advisor import EtoroAdvisor
 from advisors.yahoo_advisor import YahooAdvisor
 from advisors.strategy_advisor import StrategyAdvisor
 from messengers import MessageManager
+import time
 # from science import cluster
-import datetime
-import settings
 
-
-async def eternal_cycle():
-    while True:
-        datetime_obj = datetime.datetime.now()
-        current_time = datetime_obj.time()
-        week_day = datetime_obj.weekday()
-        try:
-            await etoro.loop()
-        except Exception as e:
-            logging.error(str(e))
-        if str(current_time).find(settings.strtime_send_message) == 0:
-
-            try:
-                await yahoo.loop()
-            except Exception as e:
-                logging.error(str(e))
-
-            # try:
-            #     cluster_message = cluster.analysis()
-            # except Exception as e:
-            #     logging.error(str(e))
-
-            messenger.send([etoro.get_message(), yahoo.get_message()],
-                           title='Рекомендации по инструментам etoro')
-        try:
-            if week_day != 6 and week_day != 5:
-                await strategy.loop()
-                if strategy.get_message():
-                    messenger.send(strategy.get_message(), title='Попытка заркыть позицию')
-        except Exception as e:
-            logging.error(str(e))
-        await asyncio.sleep(50)
 
 if '__main__' == __name__:
     try:
-        executor = ProcessPoolExecutor(1)
+        def messages_listen():
+            while not loop.is_closed():
+                messages = []
+                for client in messenger.clients:
+                    if client.get_message():
+                        messages.append(client.get_message())
+                        client.message = ''
+                if messages:
+                    messenger.send(messages, title='Мои финансы')
+                time.sleep(1)
+        executor = ThreadPoolExecutor()
+
         loop = asyncio.get_event_loop()
         messenger = MessageManager(loop)
-        etoro = EtoroAdvisor(loop)
-        yahoo = YahooAdvisor(loop)
-        strategy = StrategyAdvisor(loop)
-        # asyncio.ensure_future(loop.run_in_executor(executor, etoro.etoro_loop))
-        loop.run_until_complete(eternal_cycle())
+        messenger.clients = []
+
+        etoro = EtoroAdvisor(loop, messenger=messenger)
+        yahoo = YahooAdvisor(loop, messenger=messenger)
+        strategy = StrategyAdvisor(loop, messenger=messenger)
+        while True:
+            tasks = [
+                loop.create_task(etoro.loop()),
+                loop.create_task(yahoo.loop()),
+                loop.create_task(strategy.loop()),
+                loop.create_task(strategy.fast_grow()),
+            ]
+            asyncio.ensure_future(loop.run_in_executor(executor, messages_listen))
+            loop.run_until_complete(asyncio.wait(tasks))
     except KeyboardInterrupt:
+        loop.close()
         logging.info('Exit')

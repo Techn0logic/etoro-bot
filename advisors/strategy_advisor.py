@@ -4,11 +4,14 @@ import etoro
 from interfaces.advisor import ABCAdvisor
 from strategy import StrategyManager
 from my_logging import logger as logging
+import datetime
 
 
 class StrategyAdvisor(ABCAdvisor):
 
-    def __init__(self, loop):
+    def __init__(self, loop, **kwargs):
+        if 'messenger' in kwargs:
+            kwargs['messenger'].clients.append(self)
         self.objloop = loop
         self.swop_buy = 0.0003
         self.total_marg = 0
@@ -26,6 +29,10 @@ class StrategyAdvisor(ABCAdvisor):
         self.message = ''
 
     async def loop(self):
+        datetime_obj = datetime.datetime.now()
+        week_day = datetime_obj.weekday()
+        if week_day == 6 and week_day == 5:
+            return False
         await self.build_data()
 
     async def build_data(self):
@@ -89,6 +96,9 @@ class StrategyAdvisor(ABCAdvisor):
                     self.close_orders[instrument_name] = instrument_current_price
                     etoro.helpers.set_cache('close_orders', self.close_orders)
                     del self.fine_orders[instrument_name]
+
+    async def fast_grow(self):
+        pass
 
     def get_message(self):
         return self.message

@@ -5,6 +5,7 @@ from interfaces.advisor import ABCAdvisor
 from strategy import StrategyManager
 from my_logging import logger as logging
 import datetime
+from collections import deque
 
 
 class StrategyAdvisor(ABCAdvisor):
@@ -18,6 +19,7 @@ class StrategyAdvisor(ABCAdvisor):
         self.session = aiohttp.ClientSession(loop=loop)
         self.account_type = settings.account_type
         self.user_portfolio = {}
+        self.instruments = {}
         self.instruments_rate = {}
         self.object_strategy = StrategyManager(0, '', buy=self.buy, sell=self.sell)
         self.object_strategy.start()
@@ -27,6 +29,7 @@ class StrategyAdvisor(ABCAdvisor):
         self.close_orders = {}
         self.fine_orders = {}
         self.message = ''
+        self.watch_instuments_id = {}
 
     async def loop(self):
         datetime_obj = datetime.datetime.now()
@@ -79,10 +82,10 @@ class StrategyAdvisor(ABCAdvisor):
             else:
                 fee_relative = (instrument_current_price*100/instrument_my_price) - 100
                 fee_absolute = instrument_current_price-instrument_my_price
-            logging.info('{}: {}'.format(instrument_name, fee_relative))
+            logging.debug('{}: {}'.format(instrument_name, fee_relative))
             if fee_relative < -1.5 and position['InstrumentID'] not in self.exit_orders:
                 self.message = 'Firs case. I have tried your order. {}'.format(instrument_name)
-                await etoro.close_order(self.session, position_id)
+                # await etoro.close_order(self.session, position_id)
                 self.close_orders[instrument_name] = instrument_current_price
                 etoro.helpers.set_cache('self.close_orders', self.close_orders)
             if fee_relative > 1.5 and instrument_name not in self.fine_orders:
@@ -92,13 +95,39 @@ class StrategyAdvisor(ABCAdvisor):
                     self.fine_orders[instrument_name] = fee_relative
                 if (self.fine_orders[instrument_name] - fee_relative) >= 1.5:
                     self.message = 'Second case. I have tried your order. {}'.format(instrument_name)
-                    await etoro.close_order(self.session, position_id)
+                    # await etoro.close_order(self.session, position_id)
                     self.close_orders[instrument_name] = instrument_current_price
                     etoro.helpers.set_cache('close_orders', self.close_orders)
                     del self.fine_orders[instrument_name]
 
-    async def fast_grow(self):
-        pass
+    async def fast_change_detect(self):
+        if not self.instruments:
+            return False
+        lists = etoro.helpers.get_cache('watch_list', 10)
+        if not lists:
+            lists = await etoro.watch_list(self.session)
+            if 'Watchlists' in lists:
+                etoro.helpers.set_cache('watch_list', lists)
+            else:
+                return False
+        for watch_list in lists['Watchlists']:
+            for item_list in watch_list['Items']:
+                if item_list['ItemType'] == 'Instrument' and item_list['ItemId'] not in self.watch_instuments_id:
+                    self.watch_instuments_id[item_list['ItemId']] = deque([])
+        if not self.instruments_rate:
+            self.instruments_rate = await etoro.instruments_rate(self.session)
+            self.instruments_rate = {instrument['InstrumentID']: instrument for instrument in
+                                     self.instruments_rate['Rates']}
+        for key in self.instruments_rate:
+            if key in self.watch_instuments_id:
+                self.watch_instuments_id[key].append(self.instruments_rate[key]['LastExecution'])
+                if len(self.watch_instuments_id[key]) > 10:
+                    changing = self.watch_instuments_id[key][0] - self.watch_instuments_id[key][-1]
+                    if changing > 10 or changing < -10:
+                        logging.info('Changing for {} is {}'.format(self.instruments[key]['SymbolFull'], str(changing)))
+                        self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],
+                                                              str(changing))
+                    self.watch_instuments_id[key].popleft()
 
     def get_message(self):
         return self.message

@@ -1,9 +1,13 @@
 import aiohttp
+import asyncio
 import json
 from my_logging import logger as logging
-
+from datetime import datetime
 import settings
 import helpers
+
+LAST_REQUEST = None
+REQUEST_COUNT = 0
 
 async def trader_list(session, activeweeksmin=30, blocked=False, bonusonly=False, copyinvestmentpctmax=0,
                       gainmax=80, gainmin=5, highleveragepctmax=12, istestaccount=False, lastactivitymax=7,
@@ -58,7 +62,24 @@ async def user_portfolio(session, user_id):
         helpers.device_id(), user_id)
     return await get(session, url)
 
+async def watch_list(session):
+    url = 'https://www.etoro.com/api/watchlist/v1/watchlists?client_request_id={}&doNotReturnBadRequest=true'.format(
+        helpers.device_id()
+    )
+    return await get(session, url)
+
 async def get(session, url, json=True):
+    global LAST_REQUEST
+    global REQUEST_COUNT
+    if LAST_REQUEST is not None:
+        dif_datetime = datetime.now() - LAST_REQUEST
+        if dif_datetime.seconds < 1:
+            REQUEST_COUNT += 1
+    if REQUEST_COUNT > 10:
+        REQUEST_COUNT = 0
+        logging.debug('I am sleep')
+        await asyncio.sleep(1)
+    LAST_REQUEST = datetime.now()
     logging.debug('Get query to {url}'.format(url=url.split('?')[0]))
     headers = helpers.get_cache('headers')
     cookies = helpers.get_cache('cookies')

@@ -35,7 +35,7 @@ if '__main__' == __name__:
                 loop.create_task(etoro.loop()),
                 loop.create_task(yahoo.loop()),
                 loop.create_task(strategy.loop()),
-                loop.create_task(strategy.fast_grow()),
+                loop.create_task(strategy.fast_change_detect()),
             ]
             asyncio.ensure_future(loop.run_in_executor(executor, messages_listen))
             loop.run_until_complete(asyncio.wait(tasks))

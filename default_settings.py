@@ -1,3 +1,5 @@
+debug = False
+
 payload = {
     'Password': '',
     'UserLoginIdentifier': '',

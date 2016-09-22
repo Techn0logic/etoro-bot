@@ -28,7 +28,10 @@ class StrategyAdvisor(ABCAdvisor):
         self.exit_orders = []
         self.close_orders = {}
         self.fine_orders = {}
-        self.message = ''
+        if settings.debug:
+            self.message = ''
+        else:
+            self.message = 'Start application in debug mode'
         self.watch_instuments_id = {}
 
     async def loop(self):

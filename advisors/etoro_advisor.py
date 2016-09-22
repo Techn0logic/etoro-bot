@@ -18,10 +18,7 @@ class EtoroAdvisor(ABCAdvisor):
     def __init__(self, in_loop, **kwargs):
         if 'messenger' in kwargs:
             kwargs['messenger'].clients.append(self)
-        if settings.debug:
-            self.message = ''
-        else:
-            self.message = 'Start application in debug mode'
+        self.message = ''
         self.aggregate_data = {}
         self.trade = {}
         self.time_out = 5

@@ -1,16 +1,22 @@
 from abc import ABCMeta, abstractmethod, abstractproperty
+import settings
+import aiohttp
 
 class ABCAdvisor():
     __metaclass__ = ABCMeta
 
-    @abstractmethod
-    def __init__(self, in_loop):
-        pass
+    def __init__(self, in_loop, **kwargs):
+        if 'messenger' in kwargs:
+            kwargs['messenger'].clients.append(self)
+        if settings.debug:
+            self.message = None
+        else:
+            self.message = 'Start application'
+        self.session = aiohttp.ClientSession(loop=in_loop)
 
     @abstractmethod
     async def loop(self):
         pass
 
-    @abstractmethod
     def get_message(self):
-        pass
+        return self.message

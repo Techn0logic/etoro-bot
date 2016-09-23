@@ -1,5 +1,4 @@
 import settings
-import aiohttp
 import etoro
 from interfaces.advisor import ABCAdvisor
 from strategy import StrategyManager
@@ -11,12 +10,10 @@ from collections import deque
 class StrategyAdvisor(ABCAdvisor):
 
     def __init__(self, loop, **kwargs):
-        if 'messenger' in kwargs:
-            kwargs['messenger'].clients.append(self)
+        super().__init__(loop, **kwargs)
         self.objloop = loop
         self.swop_buy = 0.0003
         self.total_marg = 0
-        self.session = aiohttp.ClientSession(loop=loop)
         self.account_type = settings.account_type
         self.user_portfolio = {}
         self.instruments = {}
@@ -28,10 +25,6 @@ class StrategyAdvisor(ABCAdvisor):
         self.exit_orders = []
         self.close_orders = {}
         self.fine_orders = {}
-        if settings.debug:
-            self.message = ''
-        else:
-            self.message = 'Start application in debug mode'
         self.watch_instuments_id = {}
 
     async def loop(self):
@@ -58,9 +51,14 @@ class StrategyAdvisor(ABCAdvisor):
             content = await etoro.login(self.session, account_type=self.account_type)
         self.user_portfolio = content["AggregatedResult"]["ApiResponses"]["PrivatePortfolio"]["Content"][
             "ClientPortfolio"]
-        self.instruments_rate = await etoro.instruments_rate(self.session)
+
+        self.instruments_rate = etoro.helpers.get_cache('instruments_rate', (1/4))
+        if not self.instruments_rate:
+            self.instruments_rate = await etoro.instruments_rate(self.session)
+            etoro.helpers.set_cache('instruments_rate', self.instruments_rate)
         self.instruments_rate = {instrument['InstrumentID']: instrument for instrument in
                                  self.instruments_rate['Rates']}
+
         self.instruments = etoro.helpers.get_cache('instruments', 20)
         if not self.instruments:
             self.instruments = await etoro.instruments(self.session)
@@ -73,35 +71,36 @@ class StrategyAdvisor(ABCAdvisor):
     async def check_position(self):
         for position in self.user_portfolio['Positions']:
             position_id = position['CID']
-            instrument_name = self.instruments[position['InstrumentID']]['SymbolFull'];
-            instrument_current_price = self.instruments_rate[position['InstrumentID']]['LastExecution']
-            instrument_my_price = position['OpenRate']
-            instrument_is_buy = position["IsBuy"]
-            if instrument_name in self.close_orders and position['InstrumentID'] not in self.exit_orders:
-                del self.close_orders[instrument_name]
-            if not instrument_is_buy:
-                fee_relative = (instrument_my_price*100/instrument_current_price) - 100
-                fee_absolute = instrument_my_price-instrument_current_price
-            else:
-                fee_relative = (instrument_current_price*100/instrument_my_price) - 100
-                fee_absolute = instrument_current_price-instrument_my_price
-            logging.debug('{}: {}'.format(instrument_name, fee_relative))
-            if fee_relative < -1.5 and position['InstrumentID'] not in self.exit_orders:
-                self.message = 'Firs case. I have tried your order. {}'.format(instrument_name)
-                # await etoro.close_order(self.session, position_id)
-                self.close_orders[instrument_name] = instrument_current_price
-                etoro.helpers.set_cache('self.close_orders', self.close_orders)
-            if fee_relative > 1.5 and instrument_name not in self.fine_orders:
-                self.fine_orders[instrument_name] = fee_relative
-            if instrument_name in self.fine_orders:
-                if fee_relative > self.fine_orders[instrument_name]:
-                    self.fine_orders[instrument_name] = fee_relative
-                if (self.fine_orders[instrument_name] - fee_relative) >= 1.5:
-                    self.message = 'Second case. I have tried your order. {}'.format(instrument_name)
+            if position['InstrumentID'] in self.instruments and position['InstrumentID'] in self.instruments_rate:
+                instrument_name = self.instruments[position['InstrumentID']]['SymbolFull'];
+                instrument_current_price = self.instruments_rate[position['InstrumentID']]['LastExecution']
+                instrument_my_price = position['OpenRate']
+                instrument_is_buy = position["IsBuy"]
+                if instrument_name in self.close_orders and position['InstrumentID'] not in self.exit_orders:
+                    del self.close_orders[instrument_name]
+                if not instrument_is_buy:
+                    fee_relative = (instrument_my_price*100/instrument_current_price) - 100
+                    fee_absolute = instrument_my_price-instrument_current_price
+                else:
+                    fee_relative = (instrument_current_price*100/instrument_my_price) - 100
+                    fee_absolute = instrument_current_price-instrument_my_price
+                logging.debug('{}: {}'.format(instrument_name, fee_relative))
+                if fee_relative < (-1*settings.fee_relative) and position['InstrumentID'] not in self.exit_orders:
+                    self.message = 'Firs case. I have tried your order. {}'.format(instrument_name)
                     # await etoro.close_order(self.session, position_id)
                     self.close_orders[instrument_name] = instrument_current_price
-                    etoro.helpers.set_cache('close_orders', self.close_orders)
-                    del self.fine_orders[instrument_name]
+                    etoro.helpers.set_cache('self.close_orders', self.close_orders)
+                if fee_relative > settings.fee_relative and instrument_name not in self.fine_orders:
+                    self.fine_orders[instrument_name] = fee_relative
+                if instrument_name in self.fine_orders:
+                    if fee_relative > self.fine_orders[instrument_name]:
+                        self.fine_orders[instrument_name] = fee_relative
+                    if (self.fine_orders[instrument_name] - fee_relative) >= settings.fee_relative:
+                        self.message = 'Second case. I have tried your order. {}'.format(instrument_name)
+                        # await etoro.close_order(self.session, position_id)
+                        self.close_orders[instrument_name] = instrument_current_price
+                        etoro.helpers.set_cache('close_orders', self.close_orders)
+                        del self.fine_orders[instrument_name]
 
     async def fast_change_detect(self):
         if not self.instruments:
@@ -126,14 +125,11 @@ class StrategyAdvisor(ABCAdvisor):
                 self.watch_instuments_id[key].append(self.instruments_rate[key]['LastExecution'])
                 if len(self.watch_instuments_id[key]) > 10:
                     changing = self.watch_instuments_id[key][0] - self.watch_instuments_id[key][-1]
-                    if changing > 10 or changing < -10:
+                    if changing > settings.fast_grow_points or changing < (-1*settings.fast_grow_points):
                         logging.info('Changing for {} is {}'.format(self.instruments[key]['SymbolFull'], str(changing)))
                         self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],
                                                               str(changing))
                     self.watch_instuments_id[key].popleft()
-
-    def get_message(self):
-        return self.message
 
     def buy(self, count):
         print('buy', count, self.bid)

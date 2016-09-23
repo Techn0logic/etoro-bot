@@ -6,19 +6,22 @@ from advisors.yahoo_advisor import YahooAdvisor
 from advisors.strategy_advisor import StrategyAdvisor
 from messengers import MessageManager
 import time
+import settings
 # from science import cluster
 
 
 if '__main__' == __name__:
     try:
+        is_running = True
         def messages_listen():
             while not loop.is_closed():
                 messages = []
                 for client in messenger.clients:
-                    if client.get_message():
-                        messages.append(client.get_message())
+                    message = client.get_message()
+                    if message is not None and message:
+                        messages.append(message)
                         client.message = ''
-                if messages:
+                if messages and not settings.debug:
                     messenger.send(messages, title='Мои финансы')
                 time.sleep(1)
         executor = ThreadPoolExecutor()
@@ -30,7 +33,7 @@ if '__main__' == __name__:
         etoro = EtoroAdvisor(loop, messenger=messenger)
         yahoo = YahooAdvisor(loop, messenger=messenger)
         strategy = StrategyAdvisor(loop, messenger=messenger)
-        while True:
+        while is_running:
             tasks = [
                 loop.create_task(etoro.loop()),
                 loop.create_task(yahoo.loop()),

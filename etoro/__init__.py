@@ -68,14 +68,17 @@ async def watch_list(session):
     )
     return await get(session, url)
 
-async def get(session, url, json=True):
+async def get(session, url, json_flag=True, recursion_level=1):
     global LAST_REQUEST
     global REQUEST_COUNT
+    if recursion_level > 10:
+        logging.error('Recursion is too deep')
+        raise Exception('Recursion is too deep')
     if LAST_REQUEST is not None:
         dif_datetime = datetime.now() - LAST_REQUEST
         if dif_datetime.seconds < 1:
             REQUEST_COUNT += 1
-    if REQUEST_COUNT > 10:
+    if REQUEST_COUNT > 2:
         REQUEST_COUNT = 0
         logging.debug('I am sleep')
         await asyncio.sleep(1)
@@ -83,9 +86,19 @@ async def get(session, url, json=True):
     logging.debug('Get query to {url}'.format(url=url.split('?')[0]))
     headers = helpers.get_cache('headers')
     cookies = helpers.get_cache('cookies')
-    with aiohttp.Timeout(10):
-        async with session.get(url, headers=headers) as response:
-            data = await response.json()
+    try:
+        with aiohttp.Timeout(10):
+            async with session.get(url, headers=headers) as response:
+                data = await response.json()
+    except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError,
+            aiohttp.errors.ClientResponseError):
+        logging.debug('Query Error. Level {}'.format(recursion_level))
+        await asyncio.sleep(2*recursion_level)
+        return get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
+    except json.decoder.JSONDecodeError:
+        logging.debug('Json decode error. Level {}'.format(recursion_level))
+        await asyncio.sleep(2*recursion_level)
+        return get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     return data
 
 async def close_order(session, position_id, price=None, demo=True):

@@ -14,12 +14,11 @@ class YahooAdvisor(ABCAdvisor):
     async def loop(self):
         datetime_obj = datetime.datetime.today()
         current_time = datetime_obj.time()
-        if self.last_run is not None:
-            if str(current_time).find(settings.strtime_send_message) != 0:
-                return False
-            if self.last_run is not None and current_time.hour == self.last_run.hour and \
-                            current_time.day == self.last_run.day:
-                return False
+        if str(current_time).find(settings.strtime_send_message) != 0:
+            return False
+        if self.last_run is not None and current_time.hour == self.last_run.hour and \
+                        current_time.day == self.last_run.day:
+            return False
         self._message = '\r\nYahoo\r\n\r\n'
         self._message += 'Recommendation\r\n'
         for stock in settings.stocks:

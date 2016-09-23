@@ -213,17 +213,14 @@ class EtoroAdvisor(ABCAdvisor):
                 pass
 
             # await self.check_my_order(buy_max, sell_max)
-        self.message = self._message
-        self.last_run = datetime.datetime.now()
 
-    def get_message(self):
         datetime_obj = datetime.datetime.now()
         current_time = datetime_obj.today()
-        if self.last_run is not None and self.last_send_message is not None:
+        if self.last_run is not None:
             if str(current_time).find(settings.strtime_send_message) != 0:
                 return None
             if self.last_send_message is not None and current_time.hour == self.last_send_message.hour and \
                             current_time.day == self.last_send_message.day:
                 return None
-            self.last_send_message = datetime.datetime.today()
-        return super().get_message()
+        self.message = self._message
+        self.last_run = datetime.datetime.today()

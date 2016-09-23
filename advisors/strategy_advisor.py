@@ -70,13 +70,16 @@ class StrategyAdvisor(ABCAdvisor):
 
     async def check_position(self):
         for position in self.user_portfolio['Positions']:
-            position_id = position['CID']
+            # position_id = position['CID']
             if position['InstrumentID'] in self.instruments and position['InstrumentID'] in self.instruments_rate:
                 instrument_name = self.instruments[position['InstrumentID']]['SymbolFull'];
                 instrument_current_price = self.instruments_rate[position['InstrumentID']]['LastExecution']
                 instrument_my_price = position['OpenRate']
                 instrument_is_buy = position["IsBuy"]
-                if instrument_name in self.close_orders and position['InstrumentID'] not in self.exit_orders:
+                if instrument_name in self.close_orders and \
+                                self.close_orders[instrument_name] > instrument_current_price:
+                    self.message = 'Insrument {} now is fine'.format(instrument_name)
+                    logging.debug('Insrument {} now is fine'.format(instrument_name))
                     del self.close_orders[instrument_name]
                 if not instrument_is_buy:
                     fee_relative = (instrument_my_price*100/instrument_current_price) - 100

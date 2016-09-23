@@ -60,7 +60,10 @@ def get_cache(key: string, number_of_time: int=1) -> dict:
         with open(path, 'r') as fd:
             file_content = fd.read()
         fd.close()
-        return json.loads(file_content)
+        try:
+            return json.loads(file_content)
+        except json.decoder.JSONDecodeError:
+            return {}
     else:
         return {}
 

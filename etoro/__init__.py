@@ -110,7 +110,7 @@ async def close_order(session, position_id, price=None, demo=True):
             client_id=helpers.device_id(), account_type=account_type
         )
         payload = {
-            'PendingClosePositionID': '433073215'
+            'PendingClosePositionID': position_id
         }
         async with session.post(url, data=json.dumps(payload), headers=headers) as response:
             resp = await response.json()

@@ -31,7 +31,6 @@ def set_cache(key: string, data: DictInt) -> None:
     base_path = os.path.dirname(__file__)
     with open(os.path.join(base_path, 'temp', key), 'w') as fd:
         fd.write(json.dumps(data))
-    fd.close()
 
 
 def cookies_parse(response_cookies):

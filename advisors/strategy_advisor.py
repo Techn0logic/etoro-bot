@@ -70,9 +70,9 @@ class StrategyAdvisor(ABCAdvisor):
 
     async def check_position(self):
         for position in self.user_portfolio['Positions']:
-            # position_id = position['CID']
             if position['InstrumentID'] in self.instruments and position['InstrumentID'] in self.instruments_rate:
-                instrument_name = self.instruments[position['InstrumentID']]['SymbolFull'];
+                position_id = position['PositionID']
+                instrument_name = self.instruments[position['InstrumentID']]['SymbolFull']
                 instrument_current_price = self.instruments_rate[position['InstrumentID']]['LastExecution']
                 instrument_my_price = position['OpenRate']
                 instrument_is_buy = position["IsBuy"]
@@ -90,7 +90,7 @@ class StrategyAdvisor(ABCAdvisor):
                 logging.debug('{}: {}'.format(instrument_name, fee_relative))
                 if fee_relative < (-1*settings.fee_relative) and position['InstrumentID'] not in self.exit_orders:
                     self.message = 'Firs case. I have tried your order. {}'.format(instrument_name)
-                    # await etoro.close_order(self.session, position_id)
+                    await etoro.close_order(self.session, position_id, demo=False)
                     self.close_orders[instrument_name] = instrument_current_price
                     etoro.helpers.set_cache('self.close_orders', self.close_orders)
                 if fee_relative > settings.fee_relative and instrument_name not in self.fine_orders:
@@ -100,7 +100,7 @@ class StrategyAdvisor(ABCAdvisor):
                         self.fine_orders[instrument_name] = fee_relative
                     if (self.fine_orders[instrument_name] - fee_relative) >= settings.fee_relative:
                         self.message = 'Second case. I have tried your order. {}'.format(instrument_name)
-                        # await etoro.close_order(self.session, position_id)
+                        await etoro.close_order(self.session, position_id, demo=False)
                         self.close_orders[instrument_name] = instrument_current_price
                         etoro.helpers.set_cache('close_orders', self.close_orders)
                         del self.fine_orders[instrument_name]
@@ -127,7 +127,11 @@ class StrategyAdvisor(ABCAdvisor):
             if key in self.watch_instuments_id:
                 self.watch_instuments_id[key].append(self.instruments_rate[key]['LastExecution'])
                 if len(self.watch_instuments_id[key]) > 10:
-                    changing = self.watch_instuments_id[key][0] - self.watch_instuments_id[key][-1]
+                    changing = self.watch_instuments_id[key][0]/self.watch_instuments_id[key][-1]
+                    if changing > 1:
+                        changing = (1.0 - changing)*-1
+                    else:
+                        changing = changing - 1.0
                     if changing > settings.fast_grow_points or changing < (-1*settings.fast_grow_points):
                         logging.info('Changing for {} is {}'.format(self.instruments[key]['SymbolFull'], str(changing)))
                         self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],

@@ -36,8 +36,8 @@ class StrategyAdvisor(ABCAdvisor):
 
     async def build_data(self):
         history_items = await etoro.get_history(count=2)
-        self.close_orders = etoro.helpers.get_cache('self.close_orders', 0)
-        self.fine_orders = etoro.helpers.get_cache('self.fine_orders', 0)
+        self.close_orders = etoro.helpers.get_cache('close_orders', 0)
+        self.fine_orders = etoro.helpers.get_cache('fine_orders', 0)
         if not self.close_orders:
             self.close_orders = {}
         if not self.fine_orders:

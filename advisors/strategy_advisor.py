@@ -92,7 +92,6 @@ class StrategyAdvisor(ABCAdvisor):
                     self.message = 'Firs case. I have tried your order. {}'.format(instrument_name)
                     await etoro.close_order(self.session, position_id, demo=False)
                     self.close_orders[instrument_name] = instrument_current_price
-                    etoro.helpers.set_cache('self.close_orders', self.close_orders)
                 if fee_relative > settings.fee_relative and instrument_name not in self.fine_orders:
                     self.fine_orders[instrument_name] = fee_relative
                 if instrument_name in self.fine_orders:
@@ -102,8 +101,8 @@ class StrategyAdvisor(ABCAdvisor):
                         self.message = 'Second case. I have tried your order. {}'.format(instrument_name)
                         await etoro.close_order(self.session, position_id, demo=False)
                         self.close_orders[instrument_name] = instrument_current_price
-                        etoro.helpers.set_cache('close_orders', self.close_orders)
                         del self.fine_orders[instrument_name]
+        etoro.helpers.set_cache('close_orders', self.close_orders)
 
     async def fast_change_detect(self):
         if not self.instruments:

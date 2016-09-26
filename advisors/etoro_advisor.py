@@ -224,3 +224,4 @@ class EtoroAdvisor(ABCAdvisor):
                 return None
         self.message = self._message
         self.last_run = datetime.datetime.today()
+        self.last_send_message = datetime.datetime.today()

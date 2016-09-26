@@ -22,7 +22,10 @@ class YahooAdvisor(ABCAdvisor):
         self._message = '\r\nYahoo\r\n\r\n'
         self._message += 'Recommendation\r\n'
         for stock in settings.stocks:
-            url = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/{stock}?formatted=true&crumb=a9I3lxfM3R3&lang=en-US&region=US&modules=upgradeDowngradeHistory%2CrecommendationTrend%2CearningsTrend&corsDomain=finance.yahoo.com'.format(
+            url = 'https://query2.finance.yahoo.com/v10/finance/quoteSummary/{stock}?formatted=true' \
+                  '&crumb=a9I3lxfM3R3&lang=en-US&region=US' \
+                  '&modules=upgradeDowngradeHistory%2CrecommendationTrend%2CearningsTrend' \
+                  '&corsDomain=finance.yahoo.com'.format(
                 stock=stock
             )
             yahoo_data = await etoro.get(self.session, url)

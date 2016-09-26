@@ -129,9 +129,9 @@ class StrategyAdvisor(ABCAdvisor):
                 if len(self.watch_instuments_id[key]) > 10:
                     changing = self.watch_instuments_id[key][0]/self.watch_instuments_id[key][-1]
                     if changing > 1:
-                        changing = 1.0 - changing
+                        changing = (1.0 - 1/changing)*-1
                     else:
-                        changing = (changing - 1.0)*-1
+                        changing = 1.0 - changing
                     if changing > settings.fast_grow_points or changing < (-1*settings.fast_grow_points):
                         logging.info('Changing for {} is {}'.format(self.instruments[key]['SymbolFull'], str(changing)))
                         self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],

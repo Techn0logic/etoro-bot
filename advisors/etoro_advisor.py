@@ -151,11 +151,11 @@ class EtoroAdvisor(ABCAdvisor):
                     else:
                         logging.debug('You didn\'t have {} in portfolio'.format(self.instruments[instr_id]['SymbolFull']))
 
-                        if instr_id in self.instruments_rate:
-                            await etoro.order(self.session, instr_id, self.instruments_rate[instr_id][rate_type],
-                                      Amount=self.instruments_instrument[instr_id]['MinPositionAmount'],
-                                      Leverage=self.instruments_instrument[instr_id]['Leverages'][0], IsBuy=is_buy,
-                                      demo=demo)
+                        # if instr_id in self.instruments_rate:
+                        #     await etoro.order(self.session, instr_id, self.instruments_rate[instr_id][rate_type],
+                        #               Amount=self.instruments_instrument[instr_id]['MinPositionAmount'],
+                        #               Leverage=self.instruments_instrument[instr_id]['Leverages'][0], IsBuy=is_buy,
+                        #               demo=demo)
 
         self.aggregate_data = {'Buy': {}, 'Sell': {}}
         content = await etoro.login(self.session, only_info=True)
@@ -220,7 +220,7 @@ class EtoroAdvisor(ABCAdvisor):
             if str(current_time).find(settings.strtime_send_message) != 0:
                 return None
             if self.last_send_message is not None and current_time.hour == self.last_send_message.hour and \
-                            current_time.day == self.last_send_message.day:
+                            current_time.second == self.last_send_message.second:
                 return None
         self.message = self._message
         self.last_run = datetime.datetime.today()

@@ -86,19 +86,20 @@ async def get(session, url, json_flag=True, recursion_level=1):
     logging.debug('Get query to {url}'.format(url=url.split('?')[0]))
     headers = helpers.get_cache('headers')
     cookies = helpers.get_cache('cookies')
+    data= {}
     try:
         with aiohttp.Timeout(10):
             async with session.get(url, headers=headers) as response:
                 data = await response.json()
     except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError,
             aiohttp.errors.ClientResponseError):
-        logging.debug('Query Error. Level {}'.format(recursion_level))
+        logging.error('Query Error. Level {}'.format(recursion_level))
         await asyncio.sleep(2*recursion_level)
-        return get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
+        # return await get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     except json.decoder.JSONDecodeError:
-        logging.debug('Json decode error. Level {}'.format(recursion_level))
+        logging.error('Json decode error. Level {}. Text: '.format(recursion_level, data))
         await asyncio.sleep(2*recursion_level)
-        return get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
+        # return await get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     return data
 
 async def close_order(session, position_id, price=None, demo=True):
@@ -167,15 +168,23 @@ async def login(session, account_type='Demo', only_info=False):
             async with session.post(url,
                                     data=json.dumps(payload),
                                     headers=headers) as response:
-                assert response.status == 201
-                login_content_josn = await response.read()
+                if response.status == 201:
+                    login_content_josn = await response.read()
+                else:
+                    return {}
         login_content = json.loads(login_content_josn.decode('utf-8'))
         headers['Authorization'] = login_content['accessToken']
         helpers.set_cache('headers', headers)
         cookies_dict = helpers.cookies_parse(response.cookies)
         helpers.set_cache('cookies', cookies_dict)
     with aiohttp.Timeout(10):
-        async with session.get('https://www.etoro.com/api/logininfo/v1.1/logindata' ,params=params,
+        try:
+            async with session.get('https://www.etoro.com/api/logininfo/v1.1/logindata' ,params=params,
                                 headers=headers) as response:
-            login_info = await response.json()
+                login_info = await response.json()
+        except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError,
+                aiohttp.errors.ClientResponseError):
+            logging.error('Query Error.')
+        except json.decoder.JSONDecodeError:
+            logging.error('Json decode error.')
     return login_info

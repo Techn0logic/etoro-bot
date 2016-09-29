@@ -4,6 +4,8 @@ import os
 import json
 import time
 from typing import TypeVar
+from my_logging import logger as logging
+
 
 DictInt = TypeVar('DictInt', dict, list)
 defaul_time_cache = 60
@@ -29,9 +31,13 @@ def device_id():
 
 def set_cache(key: string, data: DictInt) -> None:
     base_path = os.path.dirname(__file__)
-    with open(os.path.join(base_path, 'temp', key), 'w') as fd:
-        fd.write(json.dumps(data))
-
+    try:
+        with open(os.path.join(base_path, 'temp', key), 'w') as fd:
+            fd.write(json.dumps(data))
+    except TypeError:
+        set_cache(key, {})
+    except json.JSONDecodeError:
+        logging.error('Json decode error')
 
 def cookies_parse(response_cookies):
     cookies_dict = {}

@@ -13,8 +13,9 @@ import settings
 if '__main__' == __name__:
     try:
         is_running = True
+
         def messages_listen():
-            while not loop.is_closed():
+            while is_running:
                 messages = []
                 for client in messenger.clients:
                     message = client.get_message()
@@ -39,11 +40,15 @@ if '__main__' == __name__:
                 loop.create_task(yahoo.loop()),
                 loop.create_task(strategy.loop()),
                 loop.create_task(strategy.fast_change_detect()),
+                # loop.create_task(strategy.check_fast_orders()),
             ]
             asyncio.ensure_future(loop.run_in_executor(executor, messages_listen))
             loop.run_until_complete(asyncio.wait(tasks))
     except KeyboardInterrupt:
         logging.info('Exit')
-    finally:
-        loop.close()
+        is_running = False
+        try:
+            loop.close()
+        except: pass
+
 

@@ -150,8 +150,8 @@ class StrategyAdvisor(ABCAdvisor):
                     if changing > settings.fast_grow_points or changing < (-1*settings.fast_grow_points):
                         logging.info('Changing for {} is {}'.format(self.instruments[key]['SymbolFull'], str(changing)))
                         await self.fast_deal(changing, key)
-                        self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],
-                                                              str(changing))
+                        # self.message = 'Changing {} is {}'.format(self.instruments[key]['SymbolFull'],
+                        #                                       str(changing))
                     self.watch_instuments_id[key].popleft()
 
     async def fast_deal(self, changing, key):
@@ -161,16 +161,21 @@ class StrategyAdvisor(ABCAdvisor):
             self.fast_deals = {}
         if key in self.fast_deals:
             return False
-        self.fast_deals[key] = {
-            'id': key,
-            'date': datetime.datetime.now()
-        }
-        etoro.helpers.set_cache('fast_deals', self.fast_deals)
         is_buy = True if changing > 0 else False
         min_amount = self.instruments_instrument[key]['MinPositionAmount']
         min_leverage = self.instruments_instrument[key]['Leverages'][0]
-        await etoro.order(self.session, key, self.instruments_rate[key]['LastExecution'], IsBuy=is_buy,
+        response = await etoro.order(self.session, key, self.instruments_rate[key]['LastExecution'], IsBuy=is_buy,
                           Amount=min_amount, Leverage=min_leverage)
+        if 'Token' in response:
+            self.fast_deals[key] = {
+                'id': key,
+                'date': datetime.datetime.now().strftime("%s")
+            }
+            etoro.helpers.set_cache('fast_deals', self.fast_deals)
+        else:
+            await etoro.login(self.session, account_type=self.account_type)
+            await self.fast_deal(changing, key)
+
 
     async def check_fast_orders(self):
         if 'Positions' in self.user_portfolio:

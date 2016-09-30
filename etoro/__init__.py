@@ -5,6 +5,8 @@ from my_logging import logger as logging
 from datetime import datetime
 import settings
 import helpers
+import concurrent
+
 
 LAST_REQUEST = None
 REQUEST_COUNT = 0
@@ -95,6 +97,8 @@ async def get(session, url, json_flag=True, recursion_level=1):
             aiohttp.errors.ClientResponseError):
         logging.error('Query Error. Level {}'.format(recursion_level))
         await asyncio.sleep(2*recursion_level)
+    except concurrent.futures._base.TimeoutError:
+        logging.error('Query Error.')
         # return await get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     except json.decoder.JSONDecodeError:
         logging.error('Json decode error. Level {}. Text: '.format(recursion_level, data))
@@ -184,6 +188,8 @@ async def login(session, account_type='Demo', only_info=False):
                 login_info = await response.json()
         except (asyncio.TimeoutError, aiohttp.errors.ServerDisconnectedError, aiohttp.errors.ClientOSError,
                 aiohttp.errors.ClientResponseError):
+            logging.error('Query Error.')
+        except concurrent.futures._base.TimeoutError:
             logging.error('Query Error.')
         except json.decoder.JSONDecodeError:
             logging.error('Json decode error.')

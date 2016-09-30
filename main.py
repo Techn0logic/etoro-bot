@@ -25,9 +25,10 @@ if '__main__' == __name__:
                 if messages and not settings.debug:
                     messenger.send(messages, title='Мои финансы')
                 time.sleep(1)
-        executor = ThreadPoolExecutor()
+        executor = ThreadPoolExecutor(2)
 
         loop = asyncio.get_event_loop()
+        # loop.set_default_executor(executor)
         messenger = MessageManager(loop)
         messenger.clients = []
 
@@ -48,6 +49,7 @@ if '__main__' == __name__:
         logging.info('Exit')
         is_running = False
         try:
+            # loop._default_executor.shutdown(wait=True)
             loop.close()
         except: pass
 

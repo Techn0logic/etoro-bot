@@ -35,6 +35,7 @@ def set_cache(key: string, data: DictInt) -> None:
         with open(os.path.join(base_path, 'temp', key), 'w') as fd:
             fd.write(json.dumps(data))
     except TypeError:
+        logging.error('Type error')
         set_cache(key, {})
     except json.JSONDecodeError:
         logging.error('Json decode error')

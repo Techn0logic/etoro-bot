@@ -16,8 +16,7 @@ class YahooAdvisor(ABCAdvisor):
         current_time = datetime_obj.time()
         if str(current_time).find(settings.strtime_send_message) != 0:
             return False
-        if self.last_run is not None and current_time.hour == self.last_run.hour and \
-                        current_time.second == self.last_run.second:
+        if self.last_run is not None and current_time.hour == self.last_run.hour:
             return False
         self._message = '\r\nYahoo\r\n\r\n'
         self._message += 'Recommendation\r\n'

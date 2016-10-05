@@ -101,7 +101,7 @@ async def get(session, url, json_flag=True, recursion_level=1):
         logging.error('Query Error.')
         # return await get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     except json.decoder.JSONDecodeError:
-        logging.error('Json decode error. Level {}. Url: {}, Text" {}'.format(recursion_level, url))
+        logging.error('Json decode error. Level {}. Url: {}'.format(recursion_level, url))
         await asyncio.sleep(2*recursion_level)
         # return await get(session, url, json_flag=json_flag, recursion_level=(recursion_level +1 ))
     return data

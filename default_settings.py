@@ -43,6 +43,5 @@ stocks = {
 }
 
 strtime_send_message = '00:00'
-fee_relative_max = 1.5
-fee_relative_min = -1.5
+fee_relative = {'first_case': 1.5, 'second_case': 0.5}
 fast_grow_points = 10

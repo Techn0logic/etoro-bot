@@ -171,9 +171,9 @@ class StrategyAdvisor(ABCAdvisor):
         min_amount = self.instruments_instrument[key]['MinPositionAmount']
         min_leverage = self.instruments_instrument[key]['Leverages'][0]
         if changing > 0:
-            await self.buy(self, key, self.instruments_rate[key]['LastExecution'], min_amount, min_leverage)
+            await self.buy(key, self.instruments_rate[key]['LastExecution'], min_amount, min_leverage)
         else:
-            await self.sell(self, key, self.instruments_rate[key]['LastExecution'], min_amount, min_leverage)
+            await self.sell(key, self.instruments_rate[key]['LastExecution'], min_amount, min_leverage)
 
 
     async def check_fast_orders(self):
@@ -198,14 +198,14 @@ class StrategyAdvisor(ABCAdvisor):
             etoro.helpers.set_cache('fast_deals', self.fast_deals)
         else:
             await etoro.login(self.session, account_type=self.account_type)
-            await self.make_business(last_execution, is_buy, min_amount, min_leverage)
+            await self.make_business(key, last_execution, is_buy, min_amount, min_leverage)
         return response
 
     async def buy(self, key, last_execution, min_amount, min_leverage):
-        await self.make_business(self, key, last_execution, True, min_amount, min_leverage)
+        await self.make_business(key, last_execution, True, min_amount, min_leverage)
 
     async def sell(self, key, last_execution, min_amount, min_leverage):
-        await self.make_business(self, key, last_execution, False, min_amount, min_leverage)
+        await self.make_business(key, last_execution, False, min_amount, min_leverage)
 
     async def close_order(self, position_id, instrument_name='', instrument_current_price=0.0):
         await etoro.close_order(self.session, position_id, demo=DEMO)

@@ -1,5 +1,5 @@
 aiohttp>=3.7.4
-numpy==1.11.1
+numpy>=1.21
 matplotlib==1.5.1
 scipy==0.17.1
 sklearn
